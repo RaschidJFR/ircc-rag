@@ -1,0 +1,17 @@
+{
+  "name": "ircc-rag",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node build/"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "langchain": "^0.3.30"
+  }
+}
