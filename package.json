@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "build": "npx tsc",
     "start": "node build/"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "axios": "^1.10.0",
+    "fast-xml-parser": "^5.2.5",
     "typescript": "^5.8.3"
   },
   "dependencies": {
