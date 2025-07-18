@@ -1,6 +1,7 @@
 {
   "name": "ircc-rag",
   "version": "1.0.0",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "build": "npx tsc",
@@ -10,11 +11,14 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@opendocsg/pdf2md": "^0.2.1",
     "axios": "^1.10.0",
     "fast-xml-parser": "^5.2.5",
+    "jsdom": "^26.1.0",
+    "turndown": "^7.2.0",
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "langchain": "^0.3.30"
+    "@types/node": "^24.0.14"
   }
 }
