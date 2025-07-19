@@ -3,6 +3,22 @@ import path from 'path';
 import { JSDOM } from 'jsdom';
 import TurndownService from 'turndown';
 import pdf2md from '@opendocsg/pdf2md';
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { Document } from "@langchain/core/documents";
+
+
+function extractCanonicalUrl(htmlFilePath) {
+  try {
+    const htmlContent = fs.readFileSync(htmlFilePath, 'utf-8');
+    const dom = new JSDOM(htmlContent);
+    const doc = dom.window.document;
+    const canonicalLink = doc.querySelector('link[rel="canonical"]');
+    return canonicalLink ? canonicalLink.href : '';
+  } catch (error) {
+    console.error(`Error extracting canonical URL from ${htmlFilePath}:`, error.message);
+    return '';
+  }
+}
 
 function htmlToMarkdown(htmlFilePath) {
   try {
@@ -22,6 +38,7 @@ function htmlToMarkdown(htmlFilePath) {
     const turndownService = new TurndownService({
       headingStyle: 'atx',
     });
+    turndownService.remove(['script', 'img']); // Remove script tags
 
     // Convert HTML to Markdown
     let text = ''
@@ -58,3 +75,31 @@ async function getMarkdown(filePath) {
   }
 }
 
+async function getChunks(filePath){
+  const splitter = new RecursiveCharacterTextSplitter({
+    chunkSize: 1000,
+    chunkOverlap: 200,
+  });
+
+  const text = await getMarkdown(filePath);
+  const url = extractCanonicalUrl(filePath)
+  const docOutput = await splitter.splitDocuments([
+    new Document({ 
+      pageContent: text,
+      metadata: { refUrl: url }
+    })
+  ]);
+
+  return docOutput;
+}
+
+// TO-DO: skip index.html
+
+// For testing purposes: Execute if called directly from command line
+if (import.meta.url === `file://${process.argv[1]}`) {
+  (async () => {
+    const args = process.argv.slice(2);
+    const md = await getChunks(args[0])
+    console.log(md);
+  })()
+}
