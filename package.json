@@ -11,15 +11,18 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
+    "@langchain/core": "^0.3.66",
+    "@langchain/mongodb": "^0.1.0",
+    "@langchain/openai": "^0.6.2",
     "@opendocsg/pdf2md": "^0.2.1",
+    "@types/node": "^24.0.14",
     "axios": "^1.10.0",
+    "dotenv": "^17.2.0",
     "fast-xml-parser": "^5.2.5",
     "jsdom": "^26.1.0",
     "langchain": "^0.3.30",
+    "mongodb": "^6.17.0",
     "turndown": "^7.2.0",
     "typescript": "^5.8.3"
-  },
-  "dependencies": {
-    "@types/node": "^24.0.14"
   }
 }
