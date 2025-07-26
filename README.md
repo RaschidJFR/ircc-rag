@@ -1,4 +1,5 @@
-## Work In Progress
+## IRCC RAG Chatbot
+This is a work in progress of a chatbot to answer immigration questions by consulting IRCC's official online documentation.
 
 **Getting Started**
 
@@ -6,7 +7,7 @@
 2. Populate the `.env`file (see [`.env.example`](./.env.example))
 3. Download resources (html and pdf files) from IRCC's website:`node resources/download.js`
 4. Create embeddings in a MongoDB database: `node resources/embeddings.js "<path to folder containing the downloaded .html files>"`
-5. Ask a question: `node resources/ask.js "<your question>"`
+5. Start a chat session from the command line: `npm start`
 
 **To do:**
 
@@ -16,3 +17,6 @@
     - [ ] Generate chunks and metadata from pdf files
     - [x] Vectorize chunks
     - [x] Store in database
+- [ ] Ensure links to all relevant sources are included in the response
+  - [ ] Link to text fragments
+- [ ] Build and deploy a web UI

@@ -2,6 +2,7 @@ import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
 import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL } from './env.js';
 import * as z from 'zod';
+import * as readline from 'readline/promises';
 
 const gpt = new ChatOpenAI({
   modelName: 'gpt-4o-mini',
@@ -13,13 +14,17 @@ const gpt = new ChatOpenAI({
 const mongoClient = await new MongoClient(MONGODB_URI, {}).connect();
 const collection = mongoClient.db('IRCC_RAG').collection('chunks');
 
-async function ask(query) {
+async function ask(query, messageHistory = []) {
   const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
-  Your goal is to produce a semantically clear, formal, and self-contained version of the original query, 
+  Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
-  If the question is a leading, reformulate it. 
+  If the question is a leading, reformulate it.
+  Make use of the chat history to understand the context and intent of the user.
   Do not add new information or change the user's intent.
   Answer only with the improved query, don't add any extra comments, explanation, or acknowledgements.
+
+  Chat History:
+  ${messageHistory.length > 0 ? messageHistory.map((msg) => `>"${msg}"\n`) : 'n/a'}
   
   Question: 
   \`\`\`txt
@@ -28,7 +33,11 @@ async function ask(query) {
   `;
 
   const { text: improvedQuery } = await gpt.invoke(rewriteQueryPrompt);
-  const results = await vectorSearch(improvedQuery);
+  return RAG(improvedQuery);
+}
+
+async function RAG(query) {
+  const results = await vectorSearch(query);
 
   const ragPrompt = `You are a helpful and reliable assistant.
   Your task is to answer the user's question using only the information provided in the context ("documentation") below.
@@ -45,7 +54,7 @@ async function ask(query) {
   
   Question:
   \`\`\`txt
-  ${improvedQuery}
+  ${query}
   \`\`\`
 
   Context – The context is an array of JSON elements, each with:
@@ -100,15 +109,22 @@ async function vectorSearch(query) {
 
 // For testing purposes: Execute if called directly from command line
 if (import.meta.url === `file://${process.argv[1]}`) {
-  (async () => {
-    const query = process.argv.slice(2)[0];
-    try {
-      const response = await ask(query);
-      console.log(response);
-    } catch (error) {
-      throw error;
-    } finally {
-      mongoClient.close();
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  const history = [];
+  try {
+    let query = await rl.question('Enter your question (type \'exit\' to finish):\n');
+    while (query != 'exit') {
+      const { question, answer } = await ask(query, history);
+      history.push(question, answer);
+      console.log('\n', answer, '\n');
+      query = await rl.question('>');
     }
-  })();
+  } catch (error) {
+    console.error('Error:', error);
+  } finally {
+    await mongoClient.close();
+    rl.close();
+    console.log(history)
+  }
 }
+
