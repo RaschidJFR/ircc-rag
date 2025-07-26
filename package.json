@@ -25,5 +25,8 @@
     "mongodb": "^6.17.0",
     "turndown": "^7.2.0",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
   }
 }
