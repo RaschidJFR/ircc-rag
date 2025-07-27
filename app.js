@@ -18,13 +18,17 @@ async function ask(query, messageHistory = []) {
   const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
+  
   If the question is a leading, reformulate it.
+  If question is not related to Canadian immigration or IRCC, raise and error.
+  In the error, poitely remind the user you can only help with IRCC and Immigration-related topics.
+
   Make use of the chat history to understand the context and intent of the user.
   Do not add new information or change the user's intent.
   Answer only with the improved query, don't add any extra comments, explanation, or acknowledgements.
 
   Chat History:
-  ${messageHistory.length > 0 ? messageHistory.map((msg) => `>"${msg}"\n`) : 'n/a'}
+  ${messageHistory.length == 0 ? 'n/a' : `\`\`\`json\n${JSON.stringify(messageHistory, null, 2)}\n\`\`\``}
   
   Question: 
   \`\`\`txt
@@ -32,23 +36,30 @@ async function ask(query, messageHistory = []) {
   \`\`\`
   `;
 
-  const { text: improvedQuery } = await gpt.invoke(rewriteQueryPrompt);
-  return RAG(improvedQuery);
+  const { text, error } = await gpt
+    .withStructuredOutput(
+      z.object({
+        text: z.string().describe('The reformulated query for better information retrieval'),
+        error: z.string().nullable().describe('An error message if the query cannot be reformulated'),
+      })
+    )
+    .invoke(rewriteQueryPrompt);
+  return error ? { question: query, answer: text, error } : RAG(text);
 }
 
 async function RAG(query) {
   const results = await vectorSearch(query);
 
   const ragPrompt = `You are a helpful and reliable assistant.
-  Your task is to answer the user's question using only the information provided in the context ("documentation") below.
-  If the documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information.
+  Your task is to answer the user's question using only the information provided in the context ("IRCC documentation") below.
+  If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information.
   Be accurate, concise, and neutral in tone. 
   Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
   
   Structure your answer using the Pyramid Principle: start with a clear summary of the answer, followed by supporting details, and end with references.
   Use Markdown formatting for clarity. Do not break the answer into multiple sections explicitly, but rather provide a single cohesive response.
   
-  Cite the source for each specific data point or fact using the \`refUrl\` provided in the documentation.
+  Cite the source for each specific data point or fact using the \`refUrl\` provided in the IRCC documentation.
   Place the citation immediately after the relevant statement in this format: [[<number>](https://example.com)].
   The citation numbers start at 1, increasing sequentially for each unique source in the context.
   
@@ -112,11 +123,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const history = [];
   try {
-    let query = await rl.question('Enter your question (type \'exit\' to finish):\n');
+    let query = await rl.question("Enter your question (type 'exit' to finish):\n");
     while (query != 'exit') {
-      const { question, answer } = await ask(query, history);
-      history.push(question, answer);
-      console.log('\n', answer, '\n');
+      const { question, answer, error } = await ask(query, history);
+      const reply = answer || error || '(no answer)';
+      history.push({ query: question, answer: reply });
+      console.log('\n', reply, '\n');
       query = await rl.question('>');
     }
   } catch (error) {
@@ -124,7 +136,6 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } finally {
     await mongoClient.close();
     rl.close();
-    console.log(history)
+    console.debug(history);
   }
 }
-
