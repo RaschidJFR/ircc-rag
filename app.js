@@ -1,11 +1,11 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
-import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL } from './scripts/env.js';
+import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './src/vars.js';
 import * as z from 'zod';
 import * as readline from 'readline/promises';
 
 const gpt = new ChatOpenAI({
-  modelName: 'gpt-4o-mini',
+  modelName: LLM_MODEL,
   maxTokens: 1000,
   apiKey: OPEN_AI_API_KEY,
   temperature: 0.1,
@@ -21,7 +21,7 @@ async function ask(query, messageHistory = []) {
   
   If the question is a leading, reformulate it.
   If question is not related to Canadian immigration or IRCC, raise and error.
-  In the error, poitely remind the user you can only help with IRCC and Immigration-related topics.
+  In the error, politely remind the user you can only help with IRCC and Immigration-related topics.
 
   Make use of the chat history to understand the context and intent of the user.
   Do not add new information or change the user's intent.
@@ -104,7 +104,7 @@ async function vectorSearch(query) {
           queryVector: embeddings,
           path: 'embedding',
           numCandidates: 500,
-          index: 'vector_index',
+          index: VECTOR_INDEX_NAME,
           limit: 20,
         },
       },

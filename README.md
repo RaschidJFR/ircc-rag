@@ -1,7 +1,14 @@
-## IRCC RAG Chatbot
-This is a work in progress of a chatbot to answer immigration questions by accessing [Immigration, Refugees and Citizenship Canada (IRCC)](https://ircc.canada.ca/) official online documentation.
+## IRCC Chatbot (RAG)
+This is work in progress of a **chatbot** designed to answer immigration-related questions about [Immigration, Refugees and Citizenship Canada (IRCC)](https://ircc.canada.ca/). 
+The chatbot uses a method called Retrieval Augmented Generation (RAG) to access official IRCC documentation online and provide accurate responses based on that information.
 
-**Getting Started**
+Currently, the bot is run from the command line.
+
+**Prerequisites:**
+1. A running [MongoDB](https://www.mongodb.com/) instance to store the vectorized data.
+2. An [OpenAI API key](https://platform.openai.com/api-keys) with access to `gpt-4o-mini` and `text-embedding-3-small`.
+
+**Getting Started:**
 
 1. Install dependencies: `npm install`
 2. Populate the `.env`file (see [`.env.example`](./.env.example))
@@ -17,6 +24,6 @@ This is a work in progress of a chatbot to answer immigration questions by acces
     - [x] Vectorize chunks
     - [x] Store in database
 - [ ] Ensure links to all relevant sources are included in the response
-  - [ ] Link to text fragments in browser
+    - [ ] Link to text fragments in browser
 - [ ] Build and deploy a web UI
 - [ ] Test prompt security
