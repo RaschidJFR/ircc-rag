@@ -1,6 +1,6 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
-import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL } from './env.js';
+import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL } from './scripts/env.js';
 import * as z from 'zod';
 import * as readline from 'readline/promises';
 

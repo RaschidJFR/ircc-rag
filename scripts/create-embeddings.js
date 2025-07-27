@@ -7,18 +7,8 @@ import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 import { Document } from "@langchain/core/documents";
 import { MongoDBAtlasVectorSearch } from "@langchain/mongodb";
 import { OpenAIEmbeddings } from "@langchain/openai";
-import dotenv from 'dotenv';
 import { MongoClient } from 'mongodb'
-
-dotenv.config();
-const OPENAI_API_KEY = process.env.OPEN_AI_API_KEY;
-const EMBEDDING_MODEL = 'text-embedding-3-small';
-const MONGODB_URI = process.env.MONGODB_URI;
-
-// const gpt = new OpenAI({
-//   modelName: "text-embedding-3-small",
-//   maxTokens: 1000,
-// });
+import { OPEN_AI_API_KEY, MONGODB_URI, EMBEDDING_MODEL } from './env.js';
 
 const mongoClient = await new MongoClient(MONGODB_URI, {}).connect()
 const collection = mongoClient.db('IRCC_RAG').collection('chunks');
@@ -133,7 +123,7 @@ async function generateChunksFromDirectory(directoryPath, depth = 1) {
   }
 
   if (chunks.length > 0) {
-    await generateEmbeddings(chunks)
+    await generateAndSaveEmbeddings(chunks)
   }
 
   processed.forEach(file => {
@@ -148,9 +138,9 @@ async function generateChunksFromDirectory(directoryPath, depth = 1) {
  * @param {*} chunk.metadata
  * @param {string} chunk.metadata.refUrl
  */
-async function generateEmbeddings(chunks) {
+async function generateAndSaveEmbeddings(chunks) {
   const embeddings = new OpenAIEmbeddings({
-    openAIApiKey: OPENAI_API_KEY,
+    openAIApiKey: OPEN_AI_API_KEY,
     model: EMBEDDING_MODEL,
   });
   return MongoDBAtlasVectorSearch.fromDocuments(chunks, embeddings, { collection })
