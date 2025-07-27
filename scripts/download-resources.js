@@ -2,6 +2,12 @@ import fs from 'fs/promises';
 import path from 'path';
 import { XMLParser } from 'fast-xml-parser';
 import axios from 'axios';
+import cliProgress from 'cli-progress';
+
+const SITEMAP_URL = 'https://www.ircc.canada.ca/sitemap.xml';
+const progressBar = new cliProgress.SingleBar({
+  format: 'progress: {percentage}% | ETA: {eta}s | {value}/{total}',
+});
 
 async function downloadResource(url, outputDir) {
   try {
@@ -30,11 +36,6 @@ async function downloadResource(url, outputDir) {
     // Determine if content is binary
     const binaryExts = ['.pdf', '.doc', '.docx', '.xls', '.xlsx'];
     const isBinary = binaryExts.includes(ext);
-
-    // Make axios request with appropriate response type
-    const response = await axios.get(url, {
-      responseType: isBinary ? 'arraybuffer' : 'text'
-    });
     
     // Extract path from URL and create corresponding folder structure
     const urlPath = new URL(url).pathname;
@@ -46,39 +47,51 @@ async function downloadResource(url, outputDir) {
     // Skip if file already exists
     try {
       await fs.access(filepath);
-      return;
+      console.log(` ⭕️ Skip: ${url}`);
+      // progressBar.increment(1, { file: url, emoji: '⭕️' });
+
     } catch {
-      await fs.writeFile(filepath, response.data);
+      const { data } = await axios.get(url, {
+        responseType: isBinary ? 'arraybuffer' : 'text'
+      });
+      await fs.writeFile(filepath, data);
+      console.log(` ✅ ${url}`);
+      progressBar.increment(1, { file: url, emoji: '✅' });
     }
-    console.log(`Downloaded: ${url}`);    
+
   } catch (error) {
-    console.error(`Failed to download ${url}:`, error.message);
+    console.log(` ❌ Failed: ${url} — ${error.message}`);
+    progressBar.increment(1, { file: url, emoji: '❌' });
+  } finally {
+    // progressBar.increment();
   }
 }
 
 async function main() {
   try {
     // Create downloads directory if it doesn't exist
-    const outputDir = path.join(process.cwd(), 'resources/downloads/ircc.canada.ca');
+    const outputDir = path.join(process.cwd(), 'resources/ircc.canada.ca');
     await fs.mkdir(outputDir, { recursive: true });
 
     // Read and parse sitemap
-    const sitemapPath = path.join(process.cwd(), 'resources/ircc.canada.ca sitemap.xml');
-    const sitemapContent = await fs.readFile(sitemapPath, 'utf-8');
+    console.log(`Fetching sitemap from ${SITEMAP_URL}...`);
+    const sitemapContent = await (await fetch(SITEMAP_URL)).text();
+    const sitemapData = new XMLParser().parse(sitemapContent);
+    console.log('Sitemap fetched successfully.');
+
+    // Initialize progress bar
+    const urls = sitemapData.urlset.url;
+    console.log(`Downloading ${urls.length} elements...`);
+    progressBar.start(urls.length, 0);
+    console.log('');
     
-    const parser = new XMLParser();
-    const sitemap = parser.parse(sitemapContent);
-
-    // Download each URL
-    const urls = sitemap.urlset.url;
-
-    console.log(`Preparing to download ${urls.length} elements...`)
     for (const url of urls) {
       if (url.loc) {
         await downloadResource(url.loc, outputDir);
       }
     }
 
+    progressBar.stop();
     console.log('Download complete!');
   } catch (error) {
     console.error('Error:', error.message);
