@@ -1,8 +1,7 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
-import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './src/vars.js';
+import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './vars.js';
 import * as z from 'zod';
-import * as readline from 'readline/promises';
 
 const gpt = new ChatOpenAI({
   modelName: LLM_MODEL,
@@ -11,10 +10,11 @@ const gpt = new ChatOpenAI({
   temperature: 0.1,
 });
 
+// TO-DO: properly close connection when shutting down the application
 const mongoClient = await new MongoClient(MONGODB_URI, {}).connect();
 const collection = mongoClient.db('IRCC_RAG').collection('chunks');
 
-async function ask(query, messageHistory = []) {
+async function rewriteQuery(query, messageHistory = []) {
   const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
@@ -44,7 +44,7 @@ async function ask(query, messageHistory = []) {
       })
     )
     .invoke(rewriteQueryPrompt);
-  return error ? { question: query, answer: text, error } : RAG(text);
+  return { question: query, answer: text, error };
 }
 
 async function RAG(query) {
@@ -118,35 +118,10 @@ async function vectorSearch(query) {
     .toArray();
 }
 
-// For testing purposes: Execute if called directly from command line
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
-  const history = [];
-
-  function exit(code = 0) {
-    rl.close();
-    mongoClient.close();
-    console.debug(history);
-    process.exit(code);
+export async function ask(query, messageHistory = []) {
+  const response = await rewriteQuery(query, messageHistory);
+  if (response.error) {
+    return response;
   }
-
-  process.on('SIGINT', () => exit(0));
-
-  try {
-    let query = await rl.question("Enter your question (type 'exit' to finish):\n");
-    while (query != 'exit') {
-      const { question, answer, error } = await ask(query, history);
-      const reply = error || answer || '(no answer)';
-      if (error) {
-        console.warn(`Prompt error: ${JSON.stringify({ question, answer, error }, null, 2)}`);
-      } else {
-        history.push({ query: question, answer: reply });
-      }
-      console.log('\n', reply, '\n');
-      query = await rl.question('>');
-    }
-  } catch (error) {
-    exit(1);
-  }
-  exit(0);
+  return RAG(query);
 }
