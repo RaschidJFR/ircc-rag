@@ -122,6 +122,16 @@ async function vectorSearch(query) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   const history = [];
+
+  function exit(code = 0) {
+    rl.close();
+    mongoClient.close();
+    console.debug(history);
+    process.exit(code);
+  }
+
+  process.on('SIGINT', () => exit(0));
+
   try {
     let query = await rl.question("Enter your question (type 'exit' to finish):\n");
     while (query != 'exit') {
@@ -132,10 +142,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       query = await rl.question('>');
     }
   } catch (error) {
-    console.error('Error:', error);
-  } finally {
-    await mongoClient.close();
-    rl.close();
-    console.debug(history);
+    exit(1);
   }
+  exit(0);
 }
