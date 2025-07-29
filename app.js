@@ -136,8 +136,12 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     let query = await rl.question("Enter your question (type 'exit' to finish):\n");
     while (query != 'exit') {
       const { question, answer, error } = await ask(query, history);
-      const reply = answer || error || '(no answer)';
-      history.push({ query: question, answer: reply });
+      const reply = error || answer || '(no answer)';
+      if (error) {
+        console.warn(`Prompt error: ${JSON.stringify({ question, answer, error }, null, 2)}`);
+      } else {
+        history.push({ query: question, answer: reply });
+      }
       console.log('\n', reply, '\n');
       query = await rl.question('>');
     }
