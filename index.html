@@ -1,0 +1,30 @@
+<!-- Simple page with only an embedded iframe pointing to https://ircc.canada.ca/ -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IRCC Canada</title>
+    <style>
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+      }
+      iframe {
+        border: none;
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe src="http://localhost:3001/proxy?url=/en/immigration-refugees-citizenship.html" title="IRCC Canada"></iframe>
+    <script>
+      // Optional: Add any JavaScript functionality if needed
+      console.log('IRCC Canada page loaded');
+    </script>
+  </body>
+</html>

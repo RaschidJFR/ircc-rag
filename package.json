@@ -4,7 +4,8 @@
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "node cli.js"
+    "start": "node cli.js",
+    "proxy": "node proxy/server.js"
   },
   "author": "",
   "license": "ISC",
@@ -24,6 +25,7 @@
     "@langchain/mongodb": "^0.1.0",
     "@langchain/openai": "^0.6.2",
     "dotenv": "^17.2.0",
+    "express": "^5.1.0",
     "langchain": "^0.3.30",
     "mongodb": "^6.17.0",
     "zod": "^3.25.76"
