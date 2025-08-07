@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node cli.js",
-    "proxy": "node proxy/server.js"
+    "server": "node server"
   },
   "author": "",
   "license": "ISC",
