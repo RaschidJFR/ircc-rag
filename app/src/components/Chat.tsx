@@ -54,7 +54,6 @@ export const Chat: React.FC<ChatProps> = ({ onLinkClick }) => {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={clearMessages}
                   className="hover:bg-blue-700 p-1 rounded transition-colors"
                   title="Clear conversation"
                   onClick={(e) => {
@@ -65,7 +64,6 @@ export const Chat: React.FC<ChatProps> = ({ onLinkClick }) => {
                   <Trash2 size={16} />
                 </button>
                 <button
-                  onClick={toggleChat}
                   className="hover:bg-blue-700 p-1 rounded transition-colors"
                   title="Close"
                   onClick={(e) => {
