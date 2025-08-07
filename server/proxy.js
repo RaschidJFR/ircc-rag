@@ -3,12 +3,7 @@ import express from 'express';
 const router = express.Router();
 
 router.get('/proxy', async (req, res) => {
-  const path = req.query.url;
-  if (!path || !path.startsWith('/')) {
-    return res.status(400).send('Invalid URL');
-  }
-  const basePath = 'https://www.canada.ca/';
-  const targetUrl = `${basePath}/${path}`;
+  const targetUrl = req.query.url;
   try {
     const response = await fetch(targetUrl, {
       headers: {
@@ -54,7 +49,7 @@ router.get('/proxy', async (req, res) => {
       );
       html = html.replace(
         /(href|src)=["'](\/?(?!\/|http)[^"']*?)["']/g,
-        (_, attr, path) => `${attr}="/proxy?url=${encodeURIComponent(path)}"`
+        (_, attr, path) => `${attr}="/proxy?url=${encodeURIComponent(`https://canada.ca/${path}`)}"`
       );
       res.end(html);
     } else {

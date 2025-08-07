@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Chat } from './components/Chat';
 import { Globe } from 'lucide-react';
 
@@ -6,7 +6,7 @@ function App() {
   const [iframeUrl, setIframeUrl] = useState<string>('');
 
   const handleLinkClick = (url: string) => {
-    setIframeUrl(url);
+    setIframeUrl(`/proxy?url=${encodeURIComponent(url)}`);
   };
 
   return (
@@ -26,7 +26,7 @@ function App() {
                 Close
               </button>
             </div>
-            
+
             {/* Iframe */}
             <iframe
               src={iframeUrl}
@@ -41,8 +41,8 @@ function App() {
               <Globe size={64} className="mx-auto mb-4 text-gray-300" />
               <h2 className="text-xl font-semibold mb-2">Welcome to Chat Assistant</h2>
               <p className="text-gray-600 max-w-md">
-                Start a conversation using the chat button in the bottom-right corner. 
-                When you click on links in the chat responses, they'll appear here.
+                Start a conversation using the chat button in the bottom-right corner. When you click on links in the
+                chat responses, they'll appear here.
               </p>
             </div>
           </div>
