@@ -1,8 +1,19 @@
-import * as rag from './src/rag.js';
 import readline from 'readline/promises';
 
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const history = [];
+
+async function askServer(question, history) {
+  const res = await fetch('http://localhost:3001/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question, history }),
+  });
+  if (!res.ok) {
+    return { question, answer: null, error: `HTTP ${res.status}` };
+  }
+  return await res.json();
+}
 
 function exit(code = 0) {
   rl.close();
@@ -16,7 +27,7 @@ async function main() {
   try {
     let query = await rl.question("Enter your question (type 'exit' to finish):\n");
     while (query != 'exit') {
-      const { question, answer, error } = await rag.ask(query, history);
+      const { question, answer, error } = await askServer(query, history);
       const reply = error || answer || '(no answer)';
       if (error) {
         console.warn(`Prompt error: ${JSON.stringify({ question, answer, error }, null, 2)}`);
@@ -27,6 +38,7 @@ async function main() {
       query = await rl.question('>');
     }
   } catch (error) {
+    console.error('Error during interaction:', error);
     exit(1);
   }
 
