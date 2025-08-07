@@ -123,5 +123,5 @@ export async function ask(query, messageHistory = []) {
   if (response.error) {
     return response;
   }
-  return RAG(query);
+  return RAG(response.answer);
 }

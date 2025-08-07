@@ -1,0 +1,75 @@
+import { useState, useCallback } from 'react';
+import { ChatMessage, ApiResponse } from '../types/chat';
+
+export const useChat = () => {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const sendMessage = useCallback(async (query: string) => {
+    if (!query.trim()) return;
+
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      type: 'user',
+      content: query,
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Prepare history in the format expected by the backend
+      const historyPayload = messages.map(m => ({
+        query: m.type === 'user' ? m.content : '',
+        answer: m.type === 'bot' ? m.content : ''
+      })).filter(h => h.query || h.answer);
+
+      const res = await fetch('//localhost:3001/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: query, history: historyPayload }),
+      });
+
+      if (!res.ok) {
+        setError(`HTTP ${res.status}`);
+        return;
+      }
+
+      const data: ApiResponse = await res.json();
+
+      if (data.error) {
+        setError(data.error);
+        return;
+      }
+
+      const botMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        type: 'bot',
+        content: data.answer,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages]);
+
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+    setError(null);
+  }, []);
+
+  return {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    clearMessages,
+  };
+};
