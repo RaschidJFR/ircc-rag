@@ -4,11 +4,10 @@ import { Chat } from '../components/chat/Chat';
 export default async function Page({
   searchParams,
 }: {
-  params: Promise<{ slug: string }>
-  searchParams: Promise<{ show?: string }>
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ show?: string }>;
 }) {
-
-  const targetPath  = (await searchParams).show as string | undefined;
+  const targetPath = (await searchParams).show as string | undefined;
   const url = `/proxy?url=${targetPath}`;
 
   return (
@@ -17,7 +16,6 @@ export default async function Page({
       <div className="flex-1 relative">
         {targetPath ? (
           <div className="h-full w-full relative">
-
             {/* Iframe */}
             <iframe
               src={url}
@@ -41,8 +39,7 @@ export default async function Page({
       </div>
 
       {/* Floating Chat */}
-      <Chat/>
+      <Chat />
     </div>
   );
 }
-

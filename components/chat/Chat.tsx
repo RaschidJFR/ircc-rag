@@ -5,9 +5,9 @@ import { useChat } from './hooks/useChat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 
-interface ChatProps {}
+type ChatProps = Record<string, never>;
 
-export const Chat: React.FC<ChatProps> = ({}) => {
+export const Chat: React.FC<ChatProps> = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { messages, isLoading, error, sendMessage, clearMessages } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -38,12 +38,10 @@ export const Chat: React.FC<ChatProps> = ({}) => {
 
       {/* Chat Window */}
       {isOpen && (
-        <div
-          className="fixed bottom-0 right-0 top-0 w-full h-full md:bottom-6 md:right-6 md:top-6 md:w-96 md:max-w-[calc(100vw-3rem)] md:h-[calc(100vh-3rem)] transition-all duration-300 z-40"
-        >
+        <div className="fixed bottom-0 right-0 top-0 w-full h-full md:bottom-6 md:right-6 md:top-6 md:w-96 md:max-w-[calc(100vw-3rem)] md:h-[calc(100vh-3rem)] transition-all duration-300 z-40">
           <div className="bg-white rounded-lg shadow-2xl border border-gray-200 h-full flex flex-col">
             {/* Header */}
-            <div 
+            <div
               className="bg-blue-500 text-white p-4 rounded-t-lg flex items-center justify-between cursor-pointer hover:bg-blue-600 transition-colors"
               onClick={toggleChat}
             >
@@ -86,32 +84,35 @@ export const Chat: React.FC<ChatProps> = ({}) => {
                     <p className="text-sm">Ask me anything and I'll help you find information.</p>
                   </div>
                 )}
-                
+
                 {messages.map((message) => (
-                  <ChatMessage
-                    key={message.id}
-                    message={message}
-                  />
+                  <ChatMessage key={message.id} message={message} />
                 ))}
-                
+
                 {isLoading && (
                   <div className="flex justify-start">
                     <div className="bg-gray-100 rounded-lg p-3">
                       <div className="flex space-x-1">
                         <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: '0.1s' }}
+                        ></div>
+                        <div
+                          className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                          style={{ animationDelay: '0.2s' }}
+                        ></div>
                       </div>
                     </div>
                   </div>
                 )}
-                
+
                 {error && (
                   <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
                     <p className="text-sm">{error}</p>
                   </div>
                 )}
-                
+
                 <div ref={messagesEndRef} />
               </div>
 
