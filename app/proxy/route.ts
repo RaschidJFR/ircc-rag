@@ -4,7 +4,7 @@ export async function GET(request: NextRequest) {
   try {
     let path = request.nextUrl.searchParams.get('url');
     if (!URL.canParse(path)) {
-      return new Response('Invalid URL', {
+      return new Response(`Invalid URL: ${path}`, {
         status: 400,
       });
     }

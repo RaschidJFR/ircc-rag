@@ -1,14 +1,13 @@
+'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Trash2 } from 'lucide-react';
 import { useChat } from '../hooks/useChat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 
-interface ChatProps {
-  onLinkClick: (url: string) => void;
-}
+interface ChatProps {}
 
-export const Chat: React.FC<ChatProps> = ({ onLinkClick }) => {
+export const Chat: React.FC<ChatProps> = ({}) => {
   const [isOpen, setIsOpen] = useState(false);
   const { messages, isLoading, error, sendMessage, clearMessages } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -92,7 +91,6 @@ export const Chat: React.FC<ChatProps> = ({ onLinkClick }) => {
                   <ChatMessage
                     key={message.id}
                     message={message}
-                    onLinkClick={onLinkClick}
                   />
                 ))}
                 

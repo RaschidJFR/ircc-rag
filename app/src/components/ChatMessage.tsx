@@ -2,20 +2,14 @@ import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { ChatMessage as ChatMessageType } from '../types/chat';
+import Link from 'next/link';
 
 interface ChatMessageProps {
   message: ChatMessageType;
-  onLinkClick: (url: string) => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onLinkClick }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   const isBot = message.type === 'bot';
-
-  const handleLinkClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
-    event.preventDefault();
-    const href = event.currentTarget.href;
-    onLinkClick(href);
-  };
 
   return (
     <div className={`flex mb-3 ${isBot ? 'justify-start' : 'justify-end'}`}>
@@ -33,13 +27,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onLinkClick }
                 remarkPlugins={[remarkGfm]}
                 components={{
                   a: ({ href, children }) => (
-                    <a
-                      href={href}
-                      onClick={handleLinkClick}
+                    <Link
+                      href={`/proxy?url=${encodeURI(href)}`}
                       className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
                     >
                       {children}
-                    </a>
+                    </Link>
                   ),
                   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
                   ul: ({ children }) => <ul className="list-disc list-inside mb-2">{children}</ul>,
