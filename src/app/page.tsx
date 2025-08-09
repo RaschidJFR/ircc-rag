@@ -13,7 +13,7 @@ export default async function Page({
   return (
     <div className="h-screen w-screen flex flex-col bg-gray-50">
       {/* Main Content Area */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative md:mr-96">
         {targetPath ? (
           <div className="h-full w-full relative">
             {/* Iframe */}
