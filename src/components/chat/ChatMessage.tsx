@@ -6,9 +6,10 @@ import Link from 'next/link';
 
 interface ChatMessageProps {
   message: ChatMessageType;
+  onLinkClick?: () => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onLinkClick }) => {
   const isBot = message.type === 'bot';
 
   return (
@@ -30,6 +31,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                     <Link
                       href={`/?show=${encodeURI(href)}`}
                       className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
+                      onClick={() => onLinkClick?.()}
                     >
                       {children}
                     </Link>
