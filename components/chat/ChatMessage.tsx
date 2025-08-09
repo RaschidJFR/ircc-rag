@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ChatMessage as ChatMessageType } from '../types/chat';
+import type { ChatMessage as ChatMessageType } from './chat.d';
 import Link from 'next/link';
 
 interface ChatMessageProps {

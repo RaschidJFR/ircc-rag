@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as rag from 'lib/rag';
+import * as rag from 'lib/rag.mjs';
 
 export async function POST(request: NextRequest) {
   try {

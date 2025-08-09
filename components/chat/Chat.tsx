@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Trash2 } from 'lucide-react';
-import { useChat } from '../hooks/useChat';
+import { useChat } from './hooks/useChat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 

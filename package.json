@@ -8,7 +8,7 @@
     "start": "next start",
     "dev": "next dev",
     "lint": "next lint",
-    "cli": "node cli.js",
+    "cli": "node scripts/cli.js",
     "prepare": "npm run build"
   },
   "author": "",

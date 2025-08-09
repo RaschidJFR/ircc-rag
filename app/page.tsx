@@ -1,5 +1,5 @@
 import { Globe } from 'lucide-react';
-import { Chat } from './src/components/Chat';
+import { Chat } from '../components/chat/Chat';
 
 export default async function Page({
   params,
