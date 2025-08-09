@@ -2,14 +2,13 @@ import { Globe } from 'lucide-react';
 import { Chat } from '../components/chat/Chat';
 
 export default async function Page({
-  params,
   searchParams,
 }: {
   params: Promise<{ slug: string }>
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+  searchParams: Promise<{ show?: string }>
 }) {
 
-  const targetPath  = (await searchParams).url as string | undefined;
+  const targetPath  = (await searchParams).show as string | undefined;
   const url = `/proxy?url=${targetPath}`;
 
   return (

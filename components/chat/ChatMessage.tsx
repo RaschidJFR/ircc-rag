@@ -28,7 +28,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
                 components={{
                   a: ({ href, children }) => (
                     <Link
-                      href={`/proxy?url=${encodeURI(href)}`}
+                      href={`/?show=${encodeURI(href)}`}
                       className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
                     >
                       {children}
