@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Trash2 } from 'lucide-react';
+import { MessageCircle, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useChat } from './hooks/useChat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -8,7 +8,7 @@ import { ChatInput } from './ChatInput';
 type ChatProps = Record<string, never>;
 
 export const Chat: React.FC<ChatProps> = () => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true); // Start expanded on mobile
   const { messages, isLoading, error, sendMessage, clearMessages } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -20,43 +20,21 @@ export const Chat: React.FC<ChatProps> = () => {
     scrollToBottom();
   }, [messages]);
 
-  const toggleChat = () => {
-    setIsOpen(!isOpen);
-  };
-
-  const closeChat = () => {
-    setIsOpen(false);
+  const toggleDrawer = () => {
+    setIsExpanded(!isExpanded);
   };
 
   return (
     <>
-      {/* Mobile Chat Trigger Button - Hidden on desktop */}
-      {!isOpen && (
-        <button
-          onClick={toggleChat}
-          className="fixed bottom-6 right-6 w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-300 hover:scale-110 z-40 md:hidden"
-        >
-          <MessageCircle size={24} />
-        </button>
-      )}
-
-      {/* Mobile Drawer Overlay */}
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={closeChat}
-        />
-      )}
-
       {/* Mobile Chat Drawer */}
       <div className={`fixed bottom-0 left-0 right-0 z-50 transform transition-transform duration-300 md:hidden ${
-        isOpen ? 'translate-y-0' : 'translate-y-full'
+        isExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-60px)]'
       }`}>
         <div className="bg-white rounded-t-lg shadow-2xl border-t border-gray-200 h-[80vh] flex flex-col">
-          {/* Mobile Header */}
+          {/* Mobile Header - Always visible */}
           <div
             className="bg-blue-500 text-white p-4 rounded-t-lg flex items-center justify-between cursor-pointer hover:bg-blue-600 transition-colors"
-            onClick={closeChat}
+            onClick={toggleDrawer}
           >
             <div className="flex items-center gap-2">
               <MessageCircle size={20} />
@@ -73,20 +51,16 @@ export const Chat: React.FC<ChatProps> = () => {
               >
                 <Trash2 size={16} />
               </button>
-              <button
-                className="hover:bg-blue-700 p-1 rounded transition-colors"
-                title="Close"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  closeChat();
-                }}
-              >
-                <X size={16} />
-              </button>
+              {/* Drawer indicator */}
+              {isExpanded ? (
+                <ChevronDown size={20} className="text-blue-200" />
+              ) : (
+                <ChevronUp size={20} className="text-blue-200" />
+              )}
             </div>
           </div>
 
-          {/* Mobile Messages */}
+          {/* Mobile Messages - Only visible when expanded */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
               <div className="text-center text-gray-500 py-8">
@@ -127,7 +101,7 @@ export const Chat: React.FC<ChatProps> = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Mobile Input */}
+          {/* Mobile Input - Only visible when expanded */}
           <ChatInput onSendMessage={sendMessage} isLoading={isLoading} />
         </div>
       </div>
