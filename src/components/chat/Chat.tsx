@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Bot, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useChat } from './hooks/useChat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -45,8 +45,8 @@ export const Chat: React.FC<ChatProps> = () => {
             onClick={toggleDrawer}
           >
             <div className="flex items-center gap-2">
-              <MessageCircle size={20} />
-              <h3 className="font-semibold">Chat Assistant</h3>
+              <Bot size={20} />
+              <h3 className="font-semibold">Ask me questions...</h3>
             </div>
             <div className="flex items-center gap-2">
               {/* Delete button */}
@@ -76,9 +76,9 @@ export const Chat: React.FC<ChatProps> = () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
               <div className="text-center text-gray-500 py-8">
-                <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
+                <Bot size={48} className="mx-auto mb-4 text-gray-300" />
                 <p>Start a conversation!</p>
-                <p className="text-sm">Ask me anything and I'll help you find information.</p>
+                <p className="text-sm">I can help you find answers for IRCC and immigration-related questions.</p>
               </div>
             )}
 
@@ -128,8 +128,8 @@ export const Chat: React.FC<ChatProps> = () => {
           {/* Desktop Header */}
           <div className="bg-blue-500 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <MessageCircle size={20} />
-              <h3 className="font-semibold">Chat Assistant</h3>
+              <Bot size={20} />
+              <h3 className="font-semibold">Ask me questions...</h3>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -146,9 +146,9 @@ export const Chat: React.FC<ChatProps> = () => {
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             {messages.length === 0 && (
               <div className="text-center text-gray-500 py-8">
-                <MessageCircle size={48} className="mx-auto mb-4 text-gray-300" />
+                <Bot size={48} className="mx-auto mb-4 text-gray-300" />
                 <p>Start a conversation!</p>
-                <p className="text-sm">Ask me anything and I'll help you find information.</p>
+                <p className="text-sm">I can help you find answers for IRCC and immigration-related questions.</p>
               </div>
             )}
 

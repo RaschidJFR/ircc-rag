@@ -1,4 +1,4 @@
-import { Globe } from 'lucide-react';
+import { Bot } from 'lucide-react';
 import { Chat } from '../components/chat/Chat';
 
 export default async function Page({
@@ -27,11 +27,10 @@ export default async function Page({
         ) : (
           <div className="h-full flex items-center justify-center">
             <div className="text-center text-gray-500">
-              <Globe size={64} className="mx-auto mb-4 text-gray-300" />
-              <h2 className="text-xl font-semibold mb-2">Welcome to Chat Assistant</h2>
+              <Bot size={64} className="mx-auto mb-4 text-gray-300" />
+              <h2 className="text-xl font-semibold mb-2">Welcome!</h2>
               <p className="text-gray-600 max-w-md">
-                Start a conversation using the chat button in the bottom-right corner. When you click on links in the
-                chat responses, they'll appear here.
+                When you click on links in the chat, they'll appear here.
               </p>
             </div>
           </div>
