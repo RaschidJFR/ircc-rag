@@ -37,7 +37,6 @@
     "@langchain/mongodb": "^0.1.0",
     "@langchain/openai": "^0.6.2",
     "dotenv": "^17.2.0",
-    "express": "^4.21.2",
     "langchain": "^0.3.30",
     "lucide-react": "^0.539.0",
     "mongodb": "^6.17.0",
