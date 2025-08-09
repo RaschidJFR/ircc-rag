@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import { MessageCircle, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useChat } from './hooks/useChat';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
@@ -26,11 +26,19 @@ export const Chat: React.FC<ChatProps> = () => {
 
   return (
     <>
+      {/* Mobile Drawer Backdrop */}
+      {isExpanded && (
+        <div
+          className="fixed inset-0 bg-black/20 md:hidden z-40"
+          onClick={() => setIsExpanded(false)}
+        />
+      )}
+
       {/* Mobile Chat Drawer */}
       <div className={`fixed bottom-0 left-0 right-0 z-50 transform transition-transform duration-300 md:hidden ${
         isExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-60px)]'
       }`}>
-        <div className="bg-white rounded-t-lg border-t border-gray-200 h-[80vh] flex flex-col shadow-2xl">
+        <div className="bg-white rounded-t-lg border-t border-gray-200 h-[80vh] flex flex-col shadow-2xl shadow-top">
           {/* Mobile Header - Always visible */}
           <div
             className="bg-blue-500 text-white p-4 rounded-t-lg flex items-center justify-between cursor-pointer hover:bg-blue-600 transition-colors"
@@ -41,16 +49,20 @@ export const Chat: React.FC<ChatProps> = () => {
               <h3 className="font-semibold">Chat Assistant</h3>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                className="hover:bg-blue-700 p-1 rounded transition-colors"
-                title="Clear conversation"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearMessages();
-                }}
-              >
-                <Trash2 size={16} />
-              </button>
+              {/* Delete button */}
+              {isExpanded ? (
+                <button
+                  className="hover:bg-blue-700 p-1 rounded transition-colors"
+                  title="Clear conversation"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    clearMessages();
+                  }}
+                >
+                  <Trash2 size={16} />
+                </button>
+              ) : null}
+
               {/* Drawer indicator */}
               {isExpanded ? (
                 <ChevronDown size={20} className="text-blue-200" />
