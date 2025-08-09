@@ -1,9 +1,11 @@
-## IRCC Chatbot (RAG)
+## Chatbot for IRCC website
 
-This is work in progress of a **chatbot** designed to answer immigration-related questions about [Immigration, Refugees and Citizenship Canada (IRCC)](https://ircc.canada.ca/).
-The chatbot uses a method called Retrieval Augmented Generation (RAG) to access official IRCC documentation online and provide accurate responses based on that information.
+This work in progress of a **chatbot** is designed as an AI companion to answer immigration-related questions about [Immigration, Refugees and Citizenship Canada (IRCC)](https://ircc.canada.ca/).
 
-Currently, the bot is run from the command line.
+![](./docs/demo.png)
+
+The AI chatbot uses a method called Retrieval Augmented Generation (RAG) to access official IRCC documentation online and provide accurate responses based on that information. The project is built on [Next.js](https://nextjs.org/).
+
 
 ## Getting Started
 
