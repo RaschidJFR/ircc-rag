@@ -30,7 +30,7 @@ export const Chat: React.FC<ChatProps> = () => {
       <div className={`fixed bottom-0 left-0 right-0 z-50 transform transition-transform duration-300 md:hidden ${
         isExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-60px)]'
       }`}>
-        <div className="bg-white rounded-t-lg shadow-2xl border-t border-gray-200 h-[80vh] flex flex-col">
+        <div className="bg-white rounded-t-lg border-t border-gray-200 h-[80vh] flex flex-col shadow-2xl">
           {/* Mobile Header - Always visible */}
           <div
             className="bg-blue-500 text-white p-4 rounded-t-lg flex items-center justify-between cursor-pointer hover:bg-blue-600 transition-colors"
