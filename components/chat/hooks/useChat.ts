@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ChatMessage, ApiResponse } from '../types/chat';
+import type { ChatMessage, ApiResponse } from '../chat.d';
 
 export const useChat = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -27,14 +27,15 @@ export const useChat = () => {
         answer: m.type === 'bot' ? m.content : ''
       })).filter(h => h.query || h.answer);
 
-      const res = await fetch('//localhost:3001/ask', {
+      const res = await fetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: query, history: historyPayload }),
       });
 
       if (!res.ok) {
-        setError(`HTTP ${res.status}`);
+        const { error } = await res.json();
+        setError(`${error} (${res.status})`);
         return;
       }
 
