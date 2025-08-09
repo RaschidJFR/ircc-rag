@@ -4,7 +4,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const history = [];
 
 async function askServer(question, history) {
-  const res = await fetch('http://localhost:3001/ask', {
+  const res = await fetch('http://localhost:3000/api/ask', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ question, history }),
