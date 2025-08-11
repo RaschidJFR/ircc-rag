@@ -3,6 +3,8 @@ import { NextRequest } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
     let path = request.nextUrl.searchParams.get('url');
+    const hostname = new URL(path).hostname;
+
     if (!URL.canParse(path)) {
       return new Response(`Invalid URL: ${path}`, {
         status: 400,
@@ -13,12 +15,18 @@ export async function GET(request: NextRequest) {
     if (path && !/^https?:\/\//i.test(path)) {
       // If path starts with '/', assume it's relative to canada.ca
       path = `https://canada.ca${path.startsWith('/') ? path : '/' + path}`;
+    
+      // reject if the path is for a domain other than canada.ca
+    } else if (!hostname.endsWith('canada.ca')) {
+        return new Response(`Invalid domain: ${hostname}`, {
+          status: 400,
+        });
     }
 
     console.debug('Proxying request to:', path);
     const response = await fetch(path, {
       headers: {
-        'User-Agent': 'Mozilla/5.0',
+        'User-Agent': 'IRCC-RAG/0.1',
       },
     });
 

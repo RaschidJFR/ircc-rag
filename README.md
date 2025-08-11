@@ -49,6 +49,10 @@ npm run cli
 - [ ] Ensure links to all relevant sources are included in the response
   - [ ] Link to text fragments in browser
 - [x] Build and deploy a web UI
-- [ ] Test prompt security
-  - [x] Manual tests
-  - [ ] Automate tests
+- [ ] Security
+  - [ ] Prompt security
+    - [x] Manual tests
+    - [ ] Automate tests
+  - [ ] Backend security
+    - [x] Limit proxied routes to `canada.ca` domain only
+    - [ ] Limit query length and rate
