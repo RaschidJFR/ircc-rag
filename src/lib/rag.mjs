@@ -10,8 +10,9 @@ const gpt = new ChatOpenAI({
   temperature: 0.1,
 });
 
-// TO-DO: properly close connection when shutting down the application
-const mongoClient = await new MongoClient(MONGODB_URI, {}).connect();
+const DB_NAME = 'IRCC_RAG';
+const COLLECTION_NAME = 'chunks';
+const mongoClient = new MongoClient(MONGODB_URI, {});
 const collection = mongoClient.db('IRCC_RAG').collection('chunks');
 
 async function rewriteQuery(query, messageHistory = []) {
@@ -118,10 +119,20 @@ async function vectorSearch(query) {
     .toArray();
 }
 
+async function openMongoConnection() {
+  await mongoClient.connect();
+  return mongoClient;
+}
+
 export async function ask(query, messageHistory = []) {
   const response = await rewriteQuery(query, messageHistory);
   if (response.error) {
     return response;
   }
+  await openMongoConnection();
   return RAG(response.answer);
+}
+
+export async function closeConnection() {
+  await mongoClient?.close();
 }
