@@ -46,7 +46,8 @@ npm run cli
   - [ ] Generate chunks and metadata from pdf files
   - [x] Vectorize chunks
   - [x] Store in database
-- [ ] Ensure links to all relevant sources are included in the response
+- [ ] Provide references
+  - [x] Ensure links to all relevant sources are included in the response
   - [ ] Link to text fragments in browser
 - [x] Build and deploy a web UI
 - [ ] Security
