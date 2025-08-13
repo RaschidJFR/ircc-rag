@@ -51,32 +51,35 @@ async function rewriteQuery(query, messageHistory = []) {
 async function RAG(query) {
   const results = await vectorSearch(query);
 
-  const ragPrompt = `You are a helpful and reliable assistant.
-  Your task is to answer the user's question using only the information provided in the context ("IRCC documentation") below.
-  If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information.
-  Be accurate, concise, and neutral in tone. 
-  Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
-  
-  Structure your answer using the Pyramid Principle: start with a clear summary of the answer, followed by supporting details, and end with references.
-  Use Markdown formatting for clarity. Do not break the answer into multiple sections explicitly, but rather provide a single cohesive response.
-  
-  Cite the source for each specific data point or fact using the \`refUrl\` provided in the IRCC documentation.
-  Place the citation immediately after the relevant statement in this format: [[<number>](https://example.com)].
-  The citation numbers start at 1, increasing sequentially for each unique source in the context.
-  
-  Question:
-  \`\`\`txt
-  ${query}
-  \`\`\`
+  const ragPrompt = `
+## Instructions  
+You are a helpful and reliable assistant.
+Your task is to answer the user's question using only the information provided in the context ("IRCC documentation") below.
+The context is a compilation of text chunks extracted from the IRCC documentation, each separated by a horizontal divider (---).
+The references to the original documents are numbered and provided at the end of each chunk, just above the divider.
 
-  Context – The context is an array of JSON elements, each with:
-  - \`"text"\`: a markdown-formatted snippet of relevant content
-  - \`"refUrl"\`: a string containing the source URL
+Structure your answer using the Pyramid Principle: start with a clear summary of the answer, followed by supporting details, and end with references.
+Use Markdown formatting for clarity. Do not break the answer into multiple sections explicitly, but rather provide a single cohesive response.
 
-  \`\`\`json
-  ${JSON.stringify(results)}
-  \`\`\`
-  `;
+Cite the source for each specific data point or fact using the \'Reference\' provided in the IRCC documentation.
+Place the citation immediately after the relevant statement in this format: [[<reference number>](https://example.com)].
+
+If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information.
+Be accurate, concise, and neutral in tone. 
+Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
+
+## Question:
+
+\`\`\`txt
+${query}
+\`\`\`
+
+## Context:
+
+\`\`\`markdown
+${chunksToMarkdown(results)}
+\`\`\`
+`;
 
   const response = await gpt
     .withStructuredOutput(
@@ -117,6 +120,21 @@ async function vectorSearch(query) {
       },
     ])
     .toArray();
+}
+
+function chunksToMarkdown(chunks) {
+  return chunks
+    .map(({ refUrl, text }, i) => {
+      // TO-DO: implement text fragment highlight
+      // const firstSentence = removeMd(text).match(/[\w, -]{12,}/).at(0);
+      // const lastSentence = removeMd(text).match(/[\w, -]{12,}/g).at(-1);
+      // let url = refUrl;
+      // if (firstSentence && lastSentence && firstSentence !== lastSentence) {
+      //   url = `${refUrl}#:~:text=${encodeURI(firstSentence)},${encodeURI(lastSentence)}`;
+      // }
+      return `${text}\n\nReference [${i + 1}]: ${refUrl}\n-----------------------------\n\n`;
+    })
+    .join('\n');
 }
 
 async function openMongoConnection() {
