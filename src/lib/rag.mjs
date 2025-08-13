@@ -99,7 +99,7 @@ async function vectorSearch(query) {
     model: EMBEDDING_MODEL,
   }).embedQuery(query);
 
-  return collection
+  const relevantRresults = await collection
     .aggregate([
       {
         // Any change to these parameters alters the amount of results passed to the LLM,
@@ -109,17 +109,58 @@ async function vectorSearch(query) {
           path: 'embedding',
           numCandidates: 500,
           index: VECTOR_INDEX_NAME,
-          limit: 20,
+          limit: 5,
         },
       },
       {
         $project: {
-          text: 1,
           refUrl: 1,
         },
       },
     ])
     .toArray();
+
+  const completeReferences = await collection
+    .aggregate([
+      {
+        $match: {
+          refUrl: {
+            $in: relevantRresults.map(({ refUrl }) => refUrl),
+          },
+        },
+      },
+      {
+        $sort: {
+          'loc.lines.from': 1,
+        },
+      },
+      {
+        $group: {
+          _id: '$refUrl',
+          text: {
+            $push: '$text',
+          },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          refUrl: '$_id',
+          text: {
+            $reduce: {
+              input: '$text',
+              initialValue: '',
+              in: {
+                $concat: ['$$value', '$$this'],
+              },
+            },
+          },
+        },
+      },
+    ])
+    .toArray();
+
+  return completeReferences;
 }
 
 function chunksToMarkdown(chunks) {
