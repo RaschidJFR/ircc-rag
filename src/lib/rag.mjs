@@ -1,6 +1,6 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
-import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './vars.mjs';
+import { MONGODB_URI, OPENAI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './vars.mjs';
 import * as z from 'zod';
 import fs from 'fs';
 import path from 'path';
@@ -10,7 +10,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 const gpt = new ChatOpenAI({
   modelName: LLM_MODEL,
   maxTokens: 1000,
-  apiKey: OPEN_AI_API_KEY,
+  apiKey: OPENAI_API_KEY,
   temperature: 0.1,
 });
 
@@ -123,7 +123,7 @@ async function logInteractionResults(ragPrompt, responseObject) {
 
 async function vectorSearch(query) {
   const embeddings = await new OpenAIEmbeddings({
-    openAIApiKey: OPEN_AI_API_KEY,
+    openAIApiKey: OPENAI_API_KEY,
     model: EMBEDDING_MODEL,
   }).embedQuery(query);
 
