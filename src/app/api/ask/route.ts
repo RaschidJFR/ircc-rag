@@ -16,5 +16,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message || error || 'Internal server error' }, {
       status: 500,
     });
+  } finally {
+    rag.closeConnection();
   }
 }
