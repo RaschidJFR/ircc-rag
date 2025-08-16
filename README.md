@@ -56,4 +56,5 @@ npm run cli
     - [ ] Automate tests
   - [ ] Backend security
     - [x] Limit proxied routes to `canada.ca` domain only
-    - [ ] Limit query length and rate
+    - [x] Limit query length 
+    - [ ] Limit query rates
