@@ -93,7 +93,6 @@ export default async function Page({
                   </p>
                 </div>
               </div>
-              </p>
             </div>
           </div>
         )}
