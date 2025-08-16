@@ -1,19 +1,23 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
-import { MONGODB_URI, OPEN_AI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './vars.mjs';
+import { MONGODB_URI, OPENAI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './vars.mjs';
 import * as z from 'zod';
+import fs from 'fs';
+import path from 'path';
+
+const isProduction = process.env.NODE_ENV === 'production';
 
 const gpt = new ChatOpenAI({
   modelName: LLM_MODEL,
   maxTokens: 1000,
-  apiKey: OPEN_AI_API_KEY,
+  apiKey: OPENAI_API_KEY,
   temperature: 0.1,
 });
 
 const DB_NAME = 'IRCC_RAG';
 const COLLECTION_NAME = 'chunks';
 const mongoClient = new MongoClient(MONGODB_URI, {});
-const collection = mongoClient.db('IRCC_RAG').collection('chunks');
+const collection = mongoClient.db(DB_NAME).collection(COLLECTION_NAME);
 
 async function rewriteQuery(query, messageHistory = []) {
   const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
@@ -90,16 +94,40 @@ ${chunksToMarkdown(results)}
     )
     .invoke(ragPrompt);
 
+  logInteractionResults(ragPrompt, response);
+
   return response;
+}
+
+async function logInteractionResults(ragPrompt, responseObject) {
+  if (isProduction) return;
+  // Save the ragPrompt string to a markdown file in /logs/<timestamp>.md
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const logFileName = `logs/${timestamp}.md`;
+  const logContent = `**${responseObject.question}**
+
+  \`\`\`markdown
+  ${responseObject.answer}
+  \`\`\`
+
+  # RAG Prompt
+  ${ragPrompt}
+`;
+
+  const logDir = path.dirname(logFileName);
+  if (!fs.existsSync(logDir)) {
+    fs.mkdirSync(logDir, { recursive: true });
+  }
+  fs.writeFileSync(logFileName, logContent, 'utf8');
 }
 
 async function vectorSearch(query) {
   const embeddings = await new OpenAIEmbeddings({
-    openAIApiKey: OPEN_AI_API_KEY,
+    openAIApiKey: OPENAI_API_KEY,
     model: EMBEDDING_MODEL,
   }).embedQuery(query);
 
-  const relevantRresults = await collection
+  const relevantReferences = await collection
     .aggregate([
       {
         // Any change to these parameters alters the amount of results passed to the LLM,
@@ -125,7 +153,7 @@ async function vectorSearch(query) {
       {
         $match: {
           refUrl: {
-            $in: relevantRresults.map(({ refUrl }) => refUrl),
+            $in: relevantReferences.map(({ refUrl }) => refUrl),
           },
         },
       },
