@@ -12,7 +12,8 @@
     "dev": "next dev",
     "lint": "next lint",
     "cli": "node scripts/cli.js",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "test": "node --import tsx --test tests/**/*.ts"
   },
   "author": "",
   "license": "ISC",
@@ -29,6 +30,7 @@
     "fast-xml-parser": "^5.2.5",
     "jsdom": "^26.1.0",
     "tailwindcss": "^4.1.11",
+    "tsx": "^4.20.4",
     "turndown": "^7.2.0",
     "typescript": "^5.8.3"
   },
