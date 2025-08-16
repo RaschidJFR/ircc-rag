@@ -18,8 +18,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onLinkClick }
         <div
           className={`p-3 rounded-lg ${
             isBot
-              ? 'bg-gray-100 text-gray-800 rounded-bl-sm'
-              : 'bg-blue-500 text-white rounded-br-sm'
+              ? 'bg-gray-100 rounded-bl-sm'
+              : 'bg-gray-600 text-white rounded-br-sm'
           }`}
         >
           {isBot ? (

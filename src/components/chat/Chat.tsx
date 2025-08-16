@@ -8,7 +8,7 @@ import { ChatInput } from './ChatInput';
 type ChatProps = Record<string, never>;
 
 export const Chat: React.FC<ChatProps> = () => {
-  const [isExpanded, setIsExpanded] = useState(true); // Start expanded on mobile
+  const [isExpanded, setIsExpanded] = useState(false);
   const { messages, isLoading, error, sendMessage, clearMessages } = useChat();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +41,7 @@ export const Chat: React.FC<ChatProps> = () => {
         <div className="bg-white rounded-t-lg border-t border-gray-200 h-[80vh] flex flex-col shadow-2xl shadow-top">
           {/* Mobile Header - Always visible */}
           <div
-            className="bg-blue-500 text-white p-4 rounded-t-lg flex items-center justify-between cursor-pointer hover:bg-blue-600 transition-colors"
+            className="bg-red-600 text-white p-4 rounded-t-lg flex items-center justify-between cursor-pointer hover:bg-red-700 transition-colors"
             onClick={toggleDrawer}
           >
             <div className="flex items-center gap-2">
@@ -52,7 +52,7 @@ export const Chat: React.FC<ChatProps> = () => {
               {/* Delete button */}
               {isExpanded ? (
                 <button
-                  className="hover:bg-blue-700 p-1 rounded transition-colors"
+                  className="hover:bg-red-700 p-1 rounded transition-colors"
                   title="Clear conversation"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -65,9 +65,9 @@ export const Chat: React.FC<ChatProps> = () => {
 
               {/* Drawer indicator */}
               {isExpanded ? (
-                <ChevronDown size={20} className="text-blue-200" />
+                <ChevronDown size={20} className="text-red-200" />
               ) : (
-                <ChevronUp size={20} className="text-blue-200" />
+                <ChevronUp size={20} className="text-red-200" />
               )}
             </div>
           </div>
@@ -126,14 +126,14 @@ export const Chat: React.FC<ChatProps> = () => {
       <div className="hidden md:flex md:fixed md:right-0 md:top-0 md:bottom-0 md:w-96 md:z-40">
         <div className="bg-white shadow-2xl border-l border-gray-200 h-full flex flex-col w-full">
           {/* Desktop Header */}
-          <div className="bg-blue-500 text-white p-4 flex items-center justify-between">
+          <div className="bg-red-600 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bot size={20} />
               <h3 className="font-semibold">Ask me questions...</h3>
             </div>
             <div className="flex items-center gap-2">
               <button
-                className="hover:bg-blue-700 p-1 rounded transition-colors"
+                className="hover:bg-red-700 p-1 rounded transition-colors"
                 title="Clear conversation"
                 onClick={clearMessages}
               >
