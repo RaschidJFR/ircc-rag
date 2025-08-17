@@ -2,8 +2,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Bot, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useChat } from './hooks/useChat';
-import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
+import { ChatMessageList } from './ChatMessageList';
 
 type ChatProps = Record<string, never>;
 
@@ -26,170 +26,75 @@ export const Chat: React.FC<ChatProps> = () => {
 
   return (
     <>
-      {/* Mobile Drawer Backdrop */}
-      {isExpanded && (
+      {/* Backdrop: only on mobile when expanded */}
+      {isExpanded && <div className="fixed inset-0 bg-black/20 md:hidden z-40" onClick={() => setIsExpanded(false)} />}
+
+      {/* Unified responsive chat panel */}
+      <div
+        className={`fixed z-50 bg-white shadow-2xl border-gray-200 flex flex-col
+          bottom-0 left-0 right-0 h-[80vh] rounded-t-lg border-t shadow-top transform transition-transform duration-300
+          ${isExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-60px)]'}
+          md:top-0 md:bottom-0 md:right-0 md:left-auto md:w-96 md:h-full md:rounded-none md:border-t-0 md:border-l md:translate-y-0
+        `}
+      >
+        {/* Header (clickable on mobile to toggle) */}
         <div
-          className="fixed inset-0 bg-black/20 md:hidden z-40"
-          onClick={() => setIsExpanded(false)}
-        />
-      )}
+          className="bg-red-600 text-white p-4 flex items-center justify-between rounded-t-lg md:rounded-none cursor-pointer md:cursor-default hover:bg-red-700 md:hover:bg-red-600 transition-colors"
+          onClick={toggleDrawer}
+        >
+          <div className="flex items-center gap-2">
+            <Bot size={20} />
+            <h3 className="font-semibold">Ask me questions...</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            {/* Mobile: show delete only when expanded */}
+            {isExpanded && (
+              <button
+                className="md:hidden hover:bg-red-700 p-1 rounded transition-colors"
+                title="Clear conversation"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  clearMessages();
+                }}
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
 
-      {/* Mobile Chat Drawer */}
-      <div className={`fixed bottom-0 left-0 right-0 z-50 transform transition-transform duration-300 md:hidden ${
-        isExpanded ? 'translate-y-0' : 'translate-y-[calc(100%-60px)]'
-      }`}>
-        <div className="bg-white rounded-t-lg border-t border-gray-200 h-[80vh] flex flex-col shadow-2xl shadow-top">
-          {/* Mobile Header - Always visible */}
-          <div
-            className="bg-red-600 text-white p-4 rounded-t-lg flex items-center justify-between cursor-pointer hover:bg-red-700 transition-colors"
-            onClick={toggleDrawer}
-          >
-            <div className="flex items-center gap-2">
-              <Bot size={20} />
-              <h3 className="font-semibold">Ask me questions...</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              {/* Delete button */}
-              {isExpanded ? (
-                <button
-                  className="hover:bg-red-700 p-1 rounded transition-colors"
-                  title="Clear conversation"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    clearMessages();
-                  }}
-                >
-                  <Trash2 size={16} />
-                </button>
-              ) : null}
+            {/* Desktop: always show delete */}
+            <button
+              className="hidden md:inline-flex hover:bg-red-700 p-1 rounded transition-colors"
+              title="Clear conversation"
+              onClick={(e) => {
+                e.stopPropagation();
+                clearMessages();
+              }}
+            >
+              <Trash2 size={16} />
+            </button>
 
-              {/* Drawer indicator */}
+            {/* Drawer indicator (mobile only) */}
+            <span className="md:hidden">
               {isExpanded ? (
                 <ChevronDown size={20} className="text-red-200" />
               ) : (
                 <ChevronUp size={20} className="text-red-200" />
               )}
-            </div>
+            </span>
           </div>
-
-          {/* Mobile Messages - Only visible when expanded */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center text-gray-500 py-8">
-                <Bot size={48} className="mx-auto mb-4 text-gray-300" />
-                <p>Start a conversation!</p>
-                <p className="text-sm">I can help you find answers for IRCC and immigration-related questions.</p>
-              </div>
-            )}
-
-            {messages.map((message) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                onLinkClick={() => setIsExpanded(false)}
-              />
-            ))}
-
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 rounded-lg p-3">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: '0.1s' }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: '0.2s' }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                <p className="text-sm">{error}</p>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Mobile Input - Only visible when expanded */}
-          <ChatInput onSendMessage={sendMessage} isLoading={isLoading} />
         </div>
-      </div>
 
-      {/* Desktop Side Panel */}
-      <div className="hidden md:flex md:fixed md:right-0 md:top-0 md:bottom-0 md:w-96 md:z-40">
-        <div className="bg-white shadow-2xl border-l border-gray-200 h-full flex flex-col w-full">
-          {/* Desktop Header */}
-          <div className="bg-red-600 text-white p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Bot size={20} />
-              <h3 className="font-semibold">Ask me questions...</h3>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                className="hover:bg-red-700 p-1 rounded transition-colors"
-                title="Clear conversation"
-                onClick={clearMessages}
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
+        {/* Messages */}
+        <ChatMessageList
+          messages={messages}
+          isLoading={isLoading}
+          error={error}
+          messagesEndRef={messagesEndRef}
+          onLinkClick={() => setIsExpanded(false)}
+        />
 
-          {/* Desktop Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 && (
-              <div className="text-center text-gray-500 py-8">
-                <Bot size={48} className="mx-auto mb-4 text-gray-300" />
-                <p>Start a conversation!</p>
-                <p className="text-sm">I can help you find answers for IRCC and immigration-related questions.</p>
-              </div>
-            )}
-
-            {messages.map((message) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                onLinkClick={() => setIsExpanded(false)}
-              />
-            ))}
-
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 rounded-lg p-3">
-                  <div className="flex space-x-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: '0.1s' }}
-                    ></div>
-                    <div
-                      className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                      style={{ animationDelay: '0.2s' }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-                <p className="text-sm">{error}</p>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Desktop Input */}
-          <ChatInput onSendMessage={sendMessage} isLoading={isLoading} />
-        </div>
+        {/* Input */}
+        <ChatInput onSendMessage={sendMessage} isLoading={isLoading} />
       </div>
     </>
   );
