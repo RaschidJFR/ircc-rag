@@ -8,7 +8,7 @@ import { Document } from '@langchain/core/documents';
 import { MongoDBAtlasVectorSearch } from '@langchain/mongodb';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
-import { OPEN_AI_API_KEY, MONGODB_URI, EMBEDDING_MODEL, VECTOR_INDEX_NAME } from '../src/vars.js';
+import { OPENAI_API_KEY, MONGODB_URI, EMBEDDING_MODEL, VECTOR_INDEX_NAME } from '../src/vars.mjs';
 
 const mongoClient = await new MongoClient(MONGODB_URI, {}).connect();
 const collection = mongoClient.db('IRCC_RAG').collection('chunks');
@@ -165,7 +165,7 @@ async function generateChunksFromDirectory(directoryPath, depth = 1) {
  */
 async function generateAndSaveEmbeddings(chunks) {
   const embeddings = new OpenAIEmbeddings({
-    openAIApiKey: OPEN_AI_API_KEY,
+    openAIApiKey: OPENAI_API_KEY,
     model: EMBEDDING_MODEL,
   });
   return MongoDBAtlasVectorSearch.fromDocuments(chunks, embeddings, { collection });
