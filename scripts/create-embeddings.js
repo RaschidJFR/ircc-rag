@@ -116,7 +116,7 @@ async function getChunksFromFile(filePath) {
   const docOutput = await splitter.splitDocuments([
     new Document({
       pageContent: text,
-      metadata: { refUrl: url },
+      metadata: { refUrl: url },  // TO-DO: add embedding model and last update data
     }),
   ]);
 

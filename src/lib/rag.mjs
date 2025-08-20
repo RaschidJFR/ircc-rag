@@ -1,15 +1,22 @@
 import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
-import { MONGODB_URI, OPENAI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './vars.mjs';
+import { MONGODB_URI, OPENAI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME } from './vars.mjs';
 import * as z from 'zod';
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const gpt = new ChatOpenAI({
-  modelName: LLM_MODEL,
+const gpt5Nano = new ChatOpenAI({
+  modelName: 'gpt-5-nano',
   maxTokens: 1000,
+  apiKey: OPENAI_API_KEY,
+  temperature: 0.1,
+});
+
+const gpt4oMini = new ChatOpenAI({
+  modelName: 'gpt-4o-mini',
+  maxCompletionTokens: 1000,
   apiKey: OPENAI_API_KEY,
   temperature: 0.1,
 });
@@ -19,7 +26,7 @@ const COLLECTION_NAME = 'chunks';
 const mongoClient = new MongoClient(MONGODB_URI, {});
 const collection = mongoClient.db(DB_NAME).collection(COLLECTION_NAME);
 
-async function rewriteQuery(query, messageHistory = []) {
+export async function rewriteQuery(query, messageHistory = [], model = gpt4oMini) {
   const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
@@ -41,7 +48,7 @@ async function rewriteQuery(query, messageHistory = []) {
   \`\`\`
   `;
 
-  const { text, error } = await gpt
+  const { text, error } = await model
     .withStructuredOutput(
       z.object({
         text: z.string().describe('The reformulated query for better information retrieval'),
@@ -52,7 +59,7 @@ async function rewriteQuery(query, messageHistory = []) {
   return { question: query, answer: text, error };
 }
 
-async function RAG(query) {
+async function RAG(query, model = gpt4oMini) {
   const results = await vectorSearch(query);
 
   const ragPrompt = `
@@ -85,18 +92,23 @@ ${chunksToMarkdown(results)}
 \`\`\`
 `;
 
-  const response = await gpt
-    .withStructuredOutput(
-      z.object({
-        question: z.string().describe('The original user question'),
-        answer: z.string().describe('Your answer in markdown format including citations'),
-      })
-    )
-    .invoke(ragPrompt);
+  try {
+    const response = await model
+      .withStructuredOutput(
+        z.object({
+          question: z.string().describe('The original user question'),
+          answer: z.string().describe('Your answer in markdown format including citations'),
+        })
+      )
+      .invoke(ragPrompt);
 
-  logInteractionResults(ragPrompt, response);
+    logInteractionResults(ragPrompt, response);
 
-  return response;
+    return response;
+  } catch (error) {
+    logInteractionResults(ragPrompt, { question: query, answer: `Error: ${error.message}` });
+    throw error;
+  }
 }
 
 async function logInteractionResults(ragPrompt, responseObject) {
@@ -157,9 +169,9 @@ async function vectorSearch(query) {
           },
         },
       },
-      {
-        $sort: {
-          'loc.lines.from': 1,
+            {
+              $sort: {
+                'loc.lines.from': 1,
         },
       },
       {

@@ -2,7 +2,6 @@ import dotenv from 'dotenv';
 dotenv.config({ quiet: true });
 
 export const EMBEDDING_MODEL = 'text-embedding-3-small';
-export const LLM_MODEL = 'gpt-4o-mini';
 export const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // Validate required environment variables
