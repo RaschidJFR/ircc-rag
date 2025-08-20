@@ -141,6 +141,8 @@ export async function vectorSearch(query) {
 
   await openMongoConnection();
 
+  const SEPARATOR = '\n\n\\[...\\]\n\n* * * \n\n';
+
   const results = await collection
     .aggregate([
       {
@@ -155,10 +157,20 @@ export async function vectorSearch(query) {
         },
       },
       {
-        $project: {
-          _id: 1,
-          text: 1,
+        $sort: {
           refUrl: 1,
+          'loc.lines.from': 1,
+        },
+      },
+      {
+        $group: {
+          _id: '$refUrl',
+          minLoc: {
+            $min: '$loc.lines.from',
+          },
+          text: {
+            $push: '$text',
+          },
         },
       },
       // Context reconstruction:
@@ -167,8 +179,8 @@ export async function vectorSearch(query) {
         $lookup: {
           from: 'chunks',
           let: {
-            refUrl: '$refUrl',
-            current_id: '$_id',
+            refUrl: '$_id',
+            minLoc: '$minLoc',
           },
           pipeline: [
             {
@@ -179,7 +191,7 @@ export async function vectorSearch(query) {
                       $eq: ['$refUrl', '$$refUrl'],
                     },
                     {
-                      $ne: ['$_id', '$$current_id'],
+                      $ne: ['$loc.lines.from', '$$minLoc'],
                     },
                   ],
                 },
@@ -199,19 +211,26 @@ export async function vectorSearch(query) {
       },
       {
         $addFields: {
-          mainTopic: {
+          relatedDocs: {
             $arrayElemAt: ['$relatedDocs', 0],
+          },
+          text: {
+            $reduce: {
+              input: '$text',
+              initialValue: '',
+              in: {
+                $concat: ['$$value', '$$this', SEPARATOR],
+              },
+            },
           },
         },
       },
       {
-        $addFields: {
-          mainTopic: '$mainTopic.text',
-        },
-      },
-      {
         $project: {
-          relatedDocs: 0,
+          _id: 0,
+          refUrl: '$_id',
+          text: 1,
+          mainTopic: '$relatedDocs.text',
         },
       },
     ])
@@ -239,7 +258,9 @@ export function chunksToMarkdown(chunks) {
       // if (firstSentence && lastSentence && firstSentence !== lastSentence) {
       //   url = `${refUrl}#:~:text=${encodeURI(firstSentence)},${encodeURI(lastSentence)}`;
       // }
-      return `${mainTopic ? mainTopic + '\n\n\\[...\\]\n\n* * * \n\n' : ''} ${text}\n\nReference [${i + 1}]: ${refUrl}\n-----------------------------\n\n`;
+      return `${mainTopic ? mainTopic + SEPARATOR : ''}${text}\n\nReference [${
+        i + 1
+      }]: ${refUrl}\n-----------------------------\n\n`;
     })
     .join('\n');
 }
