@@ -133,13 +133,15 @@ async function logInteractionResults(ragPrompt, responseObject) {
   fs.writeFileSync(logFileName, logContent, 'utf8');
 }
 
-async function vectorSearch(query) {
+export async function vectorSearch(query) {
   const embeddings = await new OpenAIEmbeddings({
     openAIApiKey: OPENAI_API_KEY,
     model: EMBEDDING_MODEL,
   }).embedQuery(query);
 
-  const relevantReferences = await collection
+  await openMongoConnection();
+
+  const results = await collection
     .aggregate([
       {
         // Any change to these parameters alters the amount of results passed to the LLM,
@@ -149,63 +151,87 @@ async function vectorSearch(query) {
           path: 'embedding',
           numCandidates: 500,
           index: VECTOR_INDEX_NAME,
-          limit: 5,
+          limit: 20,
         },
       },
       {
         $project: {
+          _id: 1,
+          text: 1,
           refUrl: 1,
         },
       },
-    ])
-    .toArray();
-
-  const completeReferences = await collection
-    .aggregate([
+      // Context reconstruction:
+      // Add the first chunk of the related document as the main topic.
       {
-        $match: {
-          refUrl: {
-            $in: relevantReferences.map(({ refUrl }) => refUrl),
+        $lookup: {
+          from: 'chunks',
+          let: {
+            refUrl: '$refUrl',
+            current_id: '$_id',
           },
-        },
-      },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    {
+                      $eq: ['$refUrl', '$$refUrl'],
+                    },
+                    {
+                      $ne: ['$_id', '$$current_id'],
+                    },
+                  ],
+                },
+              },
+            },
             {
               $sort: {
                 'loc.lines.from': 1,
+              },
+            },
+            {
+              $limit: 1,
+            },
+          ],
+          as: 'relatedDocs',
         },
       },
       {
-        $group: {
-          _id: '$refUrl',
-          text: {
-            $push: '$text',
+        $addFields: {
+          mainTopic: {
+            $arrayElemAt: ['$relatedDocs', 0],
           },
+        },
+      },
+      {
+        $addFields: {
+          mainTopic: '$mainTopic.text',
         },
       },
       {
         $project: {
-          _id: 0,
-          refUrl: '$_id',
-          text: {
-            $reduce: {
-              input: '$text',
-              initialValue: '',
-              in: {
-                $concat: ['$$value', '$$this'],
-              },
-            },
-          },
+          relatedDocs: 0,
         },
       },
     ])
     .toArray();
 
-  return completeReferences;
+  return results;
 }
 
-function chunksToMarkdown(chunks) {
+/**
+ * Converts an array of chunks into a Markdown-formatted string.
+ *
+ * @param {Array<Object>} chunks - An array of chunk objects to be converted.
+ * @param {string} chunks[].refUrl - The reference URL associated with the chunk.
+ * @param {string} chunks[].text - The text content of the chunk.
+ * @param {string?} chunks[].mainTopic - The initial text chunk in the related full document.
+ * @returns {string} A Markdown-formatted string containing the chunk text and references.
+ */
+export function chunksToMarkdown(chunks) {
   return chunks
-    .map(({ refUrl, text }, i) => {
+    .map(({ refUrl, text, mainTopic }, i) => {
       // TO-DO: implement text fragment highlight
       // const firstSentence = removeMd(text).match(/[\w, -]{12,}/).at(0);
       // const lastSentence = removeMd(text).match(/[\w, -]{12,}/g).at(-1);
@@ -213,7 +239,7 @@ function chunksToMarkdown(chunks) {
       // if (firstSentence && lastSentence && firstSentence !== lastSentence) {
       //   url = `${refUrl}#:~:text=${encodeURI(firstSentence)},${encodeURI(lastSentence)}`;
       // }
-      return `${text}\n\nReference [${i + 1}]: ${refUrl}\n-----------------------------\n\n`;
+      return `${mainTopic ? mainTopic + '\n\n\\[...\\]\n\n* * * \n\n' : ''} ${text}\n\nReference [${i + 1}]: ${refUrl}\n-----------------------------\n\n`;
     })
     .join('\n');
 }
@@ -228,7 +254,6 @@ export async function ask(query, messageHistory = []) {
   if (response.error) {
     return response;
   }
-  await openMongoConnection();
   return RAG(response.answer);
 }
 
