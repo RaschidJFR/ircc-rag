@@ -26,7 +26,7 @@ const COLLECTION_NAME = 'chunks';
 const mongoClient = new MongoClient(MONGODB_URI, {});
 const collection = mongoClient.db(DB_NAME).collection(COLLECTION_NAME);
 
-export async function rewriteQuery(query, messageHistory = [], model = gpt4oMini) {
+export async function rewriteQuery(query, messageHistory = [], model = gpt5Nano) {
   const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
