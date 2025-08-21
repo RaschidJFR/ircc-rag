@@ -3,7 +3,7 @@ import { OPENAI_API_KEY } from './vars.mjs';
 import * as z from 'zod';
 import fs from 'node:fs';
 import path from 'node:path';
-import { vectorSearch } from './vector-search.mjs';
+import { vectorSearch, chunksToMarkdown } from './vector-search.mjs';
 export { closeConnection } from './vector-search.mjs';
 
 const isProduction = process.env.NODE_ENV === 'production';
@@ -54,25 +54,29 @@ export async function rewriteQuery(query, messageHistory = [], model = gpt5Nano)
   return { question: query, answer: text, error };
 }
 
-async function RAG(query, model = gpt4oMini) {
-  const results = await vectorSearch(query);
-
+/**
+ *
+ * @param {string} query Question to answer using the vector database.
+ * @param {string} context Retrieved context from the vector database, formatted as markdown.
+ * @param {ChatOpenAI} model
+ * @returns {Promise<{ question: string, answer: string }>}
+ */
+export async function generateAnswer(query, context, model = gpt4oMini) {
   const ragPrompt = `
 ## Instructions  
-You are a helpful and reliable assistant.
+You are a helpful and reliable RAG chatbot assistant.
 Your task is to answer the user's question using only the information provided in the context ("IRCC documentation") below.
 The context is a compilation of text chunks extracted from the IRCC documentation, each separated by a horizontal divider (---).
 The references to the original documents are numbered and provided at the end of each chunk, just above the divider.
 
-Structure your answer using the Pyramid Principle: start with a clear summary of the answer, followed by supporting details, and end with references.
-Use Markdown formatting for clarity. Do not break the answer into multiple sections explicitly, but rather provide a single cohesive response.
-
-Cite the source for each specific data point or fact using the \'Reference\' provided in the IRCC documentation.
-Place the citation immediately after the relevant statement in this format: [[<reference number>](https://example.com)].
-
-If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information.
-Be accurate, concise, and neutral in tone. 
-Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
+1. Structure your answer using the Pyramid Principle: start with a clear summary of the answer, followed by supporting details, and end with references.
+2. Use Markdown formatting for clarity. Do not break the answer into multiple sections explicitly, but rather provide a single cohesive response.
+3. Cite the source for argument using the \'Reference\' provided at the end of each chunk.
+4. Place the citation immediately after the relevant statement in this format: [[<reference number>](https://example.com)].
+5. If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information.
+6. Be accurate, concise, and neutral in tone. 
+7. Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
+8. Add a list of potential follow-up questions the user might ask, based on the answer.
 
 ## Question:
 
@@ -83,7 +87,7 @@ ${query}
 ## Context:
 
 \`\`\`markdown
-${chunksToMarkdown(results)}
+${context}
 \`\`\`
 `;
 
@@ -93,32 +97,40 @@ ${chunksToMarkdown(results)}
         z.object({
           question: z.string().describe('The original user question'),
           answer: z.string().describe('Your answer in markdown format including citations'),
+          followUp: z
+            .array(z.string())
+            .nullable()
+            .describe('Optional list of follow-up questions the user might ask'),
         })
       )
       .invoke(ragPrompt);
 
-    logInteractionResults(ragPrompt, response);
+    logInteractionResults(ragPrompt, response, model.model);
 
     return response;
   } catch (error) {
-    logInteractionResults(ragPrompt, { question: query, answer: `Error: ${error.message}` });
+    logInteractionResults(ragPrompt, { question: query, answer: `Error: ${error.message}` }, model.model);
     throw error;
   }
 }
 
-async function logInteractionResults(ragPrompt, responseObject) {
+async function logInteractionResults(ragPrompt, responseObject, modelName) {
   if (isProduction) return;
   // Save the ragPrompt string to a markdown file in /logs/<timestamp>.md
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const logFileName = `logs/${timestamp}.md`;
+  const logFileName = `logs/${timestamp}_${modelName}.md`;
   const logContent = `**${responseObject.question}**
 
-  \`\`\`markdown
-  ${responseObject.answer}
-  \`\`\`
+\`\`\`markdown
+${responseObject.answer}
+\`\`\`
 
-  # RAG Prompt
-  ${ragPrompt}
+\`\`\`markdown
+${JSON.stringify(responseObject.followUp, null, 2)}
+\`\`\`
+
+# Prompt and Context
+${ragPrompt}
 `;
 
   const logDir = path.dirname(logFileName);
@@ -129,9 +141,12 @@ async function logInteractionResults(ragPrompt, responseObject) {
 }
 
 export async function ask(query, messageHistory = []) {
-  const response = await rewriteQuery(query, messageHistory);
-  if (response.error) {
-    return response;
+  const rewriteResponse = await rewriteQuery(query, messageHistory);
+  if (rewriteResponse.error) {
+    return rewriteResponse;
   }
-  return RAG(response.answer);
+  const sanitizedQuery = rewriteResponse.answer;
+  const vsResults = await vectorSearch(sanitizedQuery);
+  const mdReferences = chunksToMarkdown(vsResults);
+  return generateAnswer(sanitizedQuery, mdReferences, model);
 }
