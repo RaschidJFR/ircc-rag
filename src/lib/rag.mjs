@@ -1,28 +1,29 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { OPENAI_API_KEY } from './vars.mjs';
 import * as z from 'zod';
-import fs from 'node:fs';
-import path from 'node:path';
 import { vectorSearch, chunksToMarkdown } from './vector-search.mjs';
 export { closeConnection } from './vector-search.mjs';
+import { SessionLogger } from './logger.mjs';
 
-const isProduction = process.env.NODE_ENV === 'production';
+let _logger = new SessionLogger();
 
-const gpt4oMini = new ChatOpenAI({
-  modelName: 'gpt-4o-mini',
-  maxCompletionTokens: 300,
-  apiKey: OPENAI_API_KEY,
-  temperature: 0.1,
-});
+const gpt4oMini = () =>
+  new ChatOpenAI({
+    modelName: 'gpt-4o-mini',
+    maxTokens: 500,
+    apiKey: OPENAI_API_KEY,
+    temperature: 0.1,
+  });
 
-const gpt41Nano = new ChatOpenAI({
-  modelName: 'gpt-4.1-nano',
-  maxCompletionTokens: 300,
-  apiKey: OPENAI_API_KEY,
-  temperature: 0.1,
-});
+const gpt41Nano = () =>
+  new ChatOpenAI({
+    modelName: 'gpt-4.1-nano',
+    maxTokens: 500,
+    apiKey: OPENAI_API_KEY,
+    temperature: 0.1,
+  });
 
-export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMini) {
+export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMini()) {
   const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
@@ -55,6 +56,35 @@ export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMin
   return { question: query, answer: text, error };
 }
 
+export async function discriminateReferences(userQuery, referenceChunks, model = gpt4oMini()) {
+  const discriminationPrompt = `I'll give you a markdown content with a list of results from a vector search for a question.
+You will select only the references that can answer the question.
+
+1. Check the top section of each reference to understand whether the content is related to the specific user's scenario. Discard the reference if it's not.
+2. Return an array containing the selected references' numbers.
+
+**Question:** ${userQuery}
+
+**Chunks:**
+
+\`\`\`markdown
+${chunksToMarkdown(referenceChunks)}
+\`\`\`
+`;
+
+  const { indexes } = await model
+    .withStructuredOutput(
+      z.object({
+        indexes: z
+          .array(z.number())
+          .describe('An array of numbers representing the selected references from the chunks'),
+      })
+    )
+    .invoke(discriminationPrompt);
+
+  return referenceChunks.filter((_, i) => indexes.includes(i + 1));
+}
+
 /**
  *
  * @param {string} query Question to answer using the vector database.
@@ -62,8 +92,9 @@ export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMin
  * @param {ChatOpenAI} model
  * @returns {Promise<{ question: string, answer: string }>}
  */
-export async function generateAnswer(query, context, model = gpt4oMini) {
-  const ragPrompt = `
+export async function generateAnswer(query, context, model = gpt4oMini()) {
+  // TODO: disclaim that this is to assist finding information, not to provide advice.
+  const prompt = `
 ## Instructions  
 You are a helpful and reliable RAG chatbot assistant.
 Your task is to answer the user's question using only the information provided in the context ("IRCC documentation") below.
@@ -74,13 +105,15 @@ The references to the original documents are numbered and provided at the end of
 2. Use Markdown formatting for clarity. Do not break the answer into multiple sections explicitly, but rather provide a single cohesive response.
 3. Cite the source for argument using the \'Reference\' provided at the end of each chunk.
 4. Place the citation immediately after the relevant statement in this format: [[<reference number>](https://example.com)].
-5. If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information.
-6. Be accurate, concise, and neutral in tone. 
-7. Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
+5. If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information or assume.
+6. Be accurate, concise, and neutral. 
+7. Avoid arguments without references.
+8. Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
+9. Responde in less than 500 chars.
 
 ## Question:
 
-\`\`\`txt
+\`\`\`
 ${query}
 \`\`\`
 
@@ -90,34 +123,31 @@ ${query}
 ${context}
 \`\`\`
 `;
-
   try {
     const response = await model
-      .withStructuredOutput(
-        z.object({
-          question: z.string().describe('The original user question'),
-          answer: z.string().describe('Your answer in markdown format including citations'),
-        })
-      )
-      .invoke(ragPrompt);
+      // .withStructuredOutput(
+      //   z.object({
+      //     content: z.string().describe('Your answer in markdown format including citations'),
+      //   })
+      // )
+      .invoke(prompt);
 
-    logInteractionResults(ragPrompt, response, model.model);
-
-    return response;
-  } catch (error) {
-    logInteractionResults(ragPrompt, { question: query, answer: `Error: ${error.message}` }, model.model);
-    throw error;
+    return response.content;
+  } catch (e) {
+    _logger.appendResult(e.message, 'log', '# Error!');
+    _logger.append('## Prompt\n\n', prompt);
+    throw e;
   }
 }
 
-export async function decomposeQuery(userQuery, model = gpt4oMini) {
-  const questionExtractionPrompt = `You are an assistant that prepares user queries for a Retrieval-Augmented Generation (RAG) system about Canadian immigration rules.
-The user may provide a long, informal story or question. Your task is:
-1. Identify all explicit and implicit questions they are asking.  
-2. Rewrite each one as a clear, self-contained question that could be answered directly from IRCC documentation.  
-3. Condense the result into the *smallest possible set of non-overlapping, atomic questions* that fully capture the user’s intent.  
-4. Eliminate redundancy — avoid rephrasing the same issue multiple times.  
-5. Do not provide answers — only the minimal list of questions.
+export async function decomposeQuery(userQuery, model = gpt4oMini()) {
+  const questionExtractionPrompt = `The user provided a long, informal story or question. Your task is:
+1. Identify and extract all explicit questions they are asking.
+2. Rewrite each one as a clear, self-contained question.
+3. Condense the result into the *smallest possible set of non-overlapping, atomic questions* that fully capture the user's intent.  
+4. Avoid joined questions what use "and" or colon (","), or questions that are too broad.
+5. Eliminate redundancy — avoid rephrasing the same issue multiple times.  
+6. Avoid questions not clearly stated in the user query.
 
 **User question:**
 
@@ -131,7 +161,9 @@ ${userQuery}
       z.object({
         questions: z
           .array(z.string())
-          .describe('A list of questions derived from the user query, sorted by relevance top to bottom.'),
+          .describe(
+            'A list of questions derived from the user query, sorted by relevance top to bottom, each with less than 140 chars.'
+          ),
       })
     )
     .invoke(questionExtractionPrompt);
@@ -139,61 +171,54 @@ ${userQuery}
   return questions;
 }
 
-export async function extractKeyQuestion(userQuery, questionList, model = gpt41Nano) {
-  const questionDiscriminationPrompt = `You are helping prepare user queries for a Retrieval-Augmented Generation (RAG) system about Canadian immigration.
-  Input: a list of atomic questions generated from a user’s long query.
-  Task:
-  1. Identify the key question(s) that directly capture the user’s main intent.  
-     - Keep only the questions that must be answered to resolve the user’s core concern.  
-     - Discard questions that are secondary, conditional, or only relevant as follow-ups.
-  2. Output only the minimal set of key questions, without explanation, ranked by relevance to the user query.
-  Important: The result should be as short as possible while still fully representing the original user’s primary intent.
-  
-  User query:
-  
-  \`\`\`
-  ${userQuery}
-  \`\`\`
-  
-  List of questions:
-  \`\`\`
-  ${questionList.map((q) => `- ${q}`).join('\n')}
-  \`\`\`
-  `;
+export async function extractKeyQuestion(userQuery, questionList, model = gpt41Nano()) {
+  const questionDiscriminationPrompt = `From the following list of questions, select the most relevant one to best address the user's main concern.
+Do not add new questions or alter the existing ones.
+If the list of questions provided is empty, return an empty string.
+Return an empty string if you cannot determine the key question.
 
-  const { questions } = await model
+User query:
+
+\`\`\`
+${userQuery}
+\`\`\`
+
+List of questions:
+\`\`\`
+${questionList.map((q) => `- ${q}`).join('\n')}
+\`\`\`
+`;
+
+  const { content } = await model
     .withStructuredOutput(
       z.object({
-        questions: z.array(z.string()).describe('A list of key questions derived from the user query'),
+        content: z.string().describe('The key question selected from the list'),
       })
     )
     .invoke(questionDiscriminationPrompt);
 
-  if (questions.length === 0) {
-    console.warn('No key questions extracted from the user query. Defaulting to original query.');
-    questions.push(userQuery);
-  }
-
-  return questions[0];
+  return content;
 }
 
-export async function evaluateFollowUp(userQuery, generatedAnswer, model = gpt4oMini) {
+export async function evaluateFollowUp(userQuestions, generatedAnswer, model = gpt4oMini()) {
   const evaluationPrompt = `Evaluate if the answer provided by a RAG bot is fully addressing the user's concerns.
   
   Input: 
-  1. The user's original question.
+  1. The user's original questions.
   2. The answer generated by the RAG bot.
   
   Your task:
-  - Determine if the answer fully addresses the user's question.
-  - If the answer is incomplete, does not address the user's concerns, or is irrelevant, return an array with a single required follow up questions to ask the RAG bot.
-  - The questions must be ordered by relevance, with the most important question first.
-  - If the answer is complete and directly addresses the user's concerns, return an empty array.
+  - Discard the questions that have been addressed by the RAG bot's answer.
+  - Discard questions that are similar or redundant.
+  - Sort the resulting list of questions by relevance, with the most important question first.
+  - It is ok to return an empty array if all questions have been answered.
   
-  **User's question:**
+  IMPORTANT: Do not alter any question.
+  
+  **User's question(s):**
   
   \`\`\`
-  ${userQuery}
+  ${userQuestions}
   \`\`\`
   
   **RAG bot's answer:**
@@ -206,7 +231,7 @@ export async function evaluateFollowUp(userQuery, generatedAnswer, model = gpt4o
   const { questions } = await model
     .withStructuredOutput(
       z.object({
-        questions: z.array(z.string()).describe('An array containing 1 question as input to the RAG bot'),
+        questions: z.array(z.string()).describe('An array containing the pending question'),
       })
     )
     .invoke(evaluationPrompt);
@@ -214,53 +239,80 @@ export async function evaluateFollowUp(userQuery, generatedAnswer, model = gpt4o
   return questions;
 }
 
-async function logInteractionResults(ragPrompt, responseObject, modelName) {
-  if (isProduction) return;
-  // Save the ragPrompt string to a markdown file in /logs/<timestamp>.md
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const logFileName = `logs/${timestamp}_${modelName}.md`;
-  const logContent = `**${responseObject.question}**
+export async function generateClarifyingQuestions(userQuery, references, model = gpt4oMini()) {
+  const prompt = `Given this user query and the retrieved IRCC content, list the single most important nuances that directly impacts the user's scenario. 
+Then ask a clarifying question to get the required context from the user.
+Only include questions that are completely relevant to the user's decision.
+Respond with a single question addressed to the user. Do not add comments or instructions.
+If no evident additional information is required or clear, return an empty string.
 
-\`\`\`markdown
-${responseObject.answer}
+**User Query:**
+
+\`\`\`
+${userQuery}
 \`\`\`
 
-# Prompt and Context
-${ragPrompt}
+**Retrieved IRCC Content:**
+
+\`\`\`markdown
+${references}
+\`\`\`
 `;
 
-  const logDir = path.dirname(logFileName);
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
-  }
-  fs.writeFileSync(logFileName, logContent, 'utf8');
+  const { content } = await model.invoke(prompt);
+  return content;
 }
 
-export async function ask(query, messageHistory = [], followUpDepth = 1) {
-  const startTime = Date.now();
+export async function ask(query, messageHistory = [], maxFollowUps = 1, logger = new SessionLogger()) {
+  try {
+    _logger = logger;
+    logger.append('Question:\n\n', '>', query);
 
-  const rewriteResponse = await sanitizeQuery(query, messageHistory);
-  if (rewriteResponse.error) {
-    return rewriteResponse;
-  }
-  const userQuery = rewriteResponse.answer;
-  const parsedQuestions = await decomposeQuery(userQuery);
-  const keyQuestion = await extractKeyQuestion(parsedQuestions, parsedQuestions);
-  const retrievedContext = await vectorSearch(keyQuestion);
-  const mdReferences = chunksToMarkdown(retrievedContext);
-  const ragResponse = await generateAnswer(keyQuestion, mdReferences);
-  const followUp = await evaluateFollowUp(userQuery, ragResponse.answer);
-
-  if (followUp.length > 0) {
-    if (followUpDepth > 0) {
-      const history = messageHistory.concat(ragResponse);
-      const { answer: fuA, question: fuQ } = await ask(followUp[0], history, followUpDepth - 1);
-      ragResponse.answer += `\n\n**${fuQ}**\n\n${fuA}`;
+    // Sanitize query
+    const sanitizedResponse = await sanitizeQuery(query, messageHistory);
+    if (sanitizedResponse.error) {
+      logger.appendResult(sanitizedResponse.error);
+      return sanitizedResponse;
     }
-  } else {
-    const endTime = Date.now();
-    console.debug(`ask function completed in ${((endTime - startTime) / 1000).toFixed(1)}s`);
-  }
 
-  return ragResponse;
+    let keyQuestion = sanitizedResponse.answer;
+    logger.appendResult(keyQuestion, '', 'Sanitized Query:');
+
+    let pendingQuestions = await decomposeQuery(keyQuestion);
+    let finalAnswer = '';
+    let refIndex = 0;
+
+    while (pendingQuestions.length > 0 && maxFollowUps-- >= 0) {
+      const mdQuestions = pendingQuestions.filter((q) => q !== keyQuestion).map((q) => '- [ ] ' + q);
+      mdQuestions.unshift(`- [x] ${keyQuestion}`);
+      logger.appendResult(mdQuestions.join('\n'), 'markdown', 'Key Questions');
+
+      const retrievedChunks = await vectorSearch(keyQuestion);
+      const selectedChunks = await discriminateReferences(keyQuestion, retrievedChunks);
+      const mdReferences = chunksToMarkdown(selectedChunks, refIndex);
+      refIndex += selectedChunks.length;
+      logger.appendResult(mdReferences, 'markdown', `## References (${selectedChunks.length})`);
+
+      let answer = await generateAnswer(keyQuestion, mdReferences);
+      logger.append('## Answer\n\n', `\n\n**${keyQuestion}**\n\n`, answer);
+      logger.tick();
+      logger.insert(logger.content.pop(), -1); // swap the last to items in logger.content
+      finalAnswer += '\n\n' + answer;
+
+      pendingQuestions = await evaluateFollowUp(pendingQuestions, finalAnswer);
+      if (pendingQuestions.length > 0 && maxFollowUps > 0) {
+        logger.appendResult(pendingQuestions.map((q) => '- ' + q).join('\n'), '', `# Follow-up`);
+        keyQuestion = pendingQuestions[0];
+      }
+    }
+
+    //TODO: dedup answer in case follow up is redundant
+
+    logger.write();
+    return { question: keyQuestion, answer: finalAnswer };
+  } catch (e) {
+    logger.appendResult('Error:' + e.message, 'log');
+    logger.write();
+    throw e;
+  }
 }

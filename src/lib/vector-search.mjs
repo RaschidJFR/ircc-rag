@@ -1,16 +1,13 @@
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { MongoClient } from 'mongodb';
 import { MONGODB_URI, OPENAI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME } from './vars.mjs';
-import * as z from 'zod';
-import fs from 'node:fs';
-import path from 'node:path';
 
 const DB_NAME = 'IRCC_RAG';
 const COLLECTION_NAME = 'chunks';
 const mongoClient = new MongoClient(MONGODB_URI, {});
 const collection = mongoClient.db(DB_NAME).collection(COLLECTION_NAME);
 
-export async function vectorSearch(query) {
+export async function vectorSearch(query, { numCandidates, limit } = { numCandidates: 500, limit: 10 }) {
   const embeddings = await new OpenAIEmbeddings({
     openAIApiKey: OPENAI_API_KEY,
     model: EMBEDDING_MODEL,
@@ -26,9 +23,9 @@ export async function vectorSearch(query) {
         $vectorSearch: {
           queryVector: embeddings,
           path: 'embedding',
-          numCandidates: 500,
           index: VECTOR_INDEX_NAME,
-          limit: 20,
+          numCandidates,
+          limit,
         },
       },
       // Omit documents without a refUrl.
@@ -154,7 +151,7 @@ function getContextReconstructionAggregationStages() {
  * @param {string?} chunks[].mainTopic - The initial text chunk in the related full document.
  * @returns {string} A Markdown-formatted string containing the chunk text and references.
  */
-export function chunksToMarkdown(chunks) {
+export function chunksToMarkdown(chunks, startIndex = 0) {
   return chunks
     .map(({ refUrl, text, mainTopic }, i) => {
       // TO-DO: implement text fragment highlight
@@ -167,7 +164,7 @@ export function chunksToMarkdown(chunks) {
 
       const SEPARATOR = '\n\n\\[...\\]\n\n* * * \n\n';
       return `${mainTopic ? mainTopic + SEPARATOR : ''}${text}\n\nReference [${
-        i + 1
+        i + 1 + startIndex
       }]: ${refUrl}\n-----------------------------\n\n`;
     })
     .join('\n');

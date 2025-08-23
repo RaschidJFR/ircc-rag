@@ -36,11 +36,11 @@ export async function POST(request: NextRequest) {
 function checkLength(text: string | string[]) {
   if (Array.isArray(text)) {
     if (text.some((t) => t.length > CHAR_LIMIT)) {
-      throw new Error(`One of the queries exceeds character limit of ${CHAR_LIMIT}`);
+      throw new Error(`One of the queries exceeds the limit of ${CHAR_LIMIT} characters`);
     }
   } else {
     if (text.length > CHAR_LIMIT) {
-      throw new Error(`Query exceeds character limit of ${CHAR_LIMIT}`);
+      throw new Error(`Query exceeds limit of ${CHAR_LIMIT} characters`);
     }
   }
 }
