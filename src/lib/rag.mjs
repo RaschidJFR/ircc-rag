@@ -7,6 +7,14 @@ import { SessionLogger } from './logger.mjs';
 
 let _logger = new SessionLogger();
 
+const gpt41 = () =>
+  new ChatOpenAI({
+    modelName: 'gpt-4.1',
+    maxTokens: 500,
+    apiKey: OPENAI_API_KEY,
+    temperature: 0.1,
+  });
+
 const gpt4oMini = () =>
   new ChatOpenAI({
     modelName: 'gpt-4o-mini',
@@ -56,6 +64,10 @@ export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMin
   return { question: query, answer: text, error };
 }
 
+/**
+ * This function filters the references based on their relevance to the user's query.
+ * It is recommended in the case when the vector search returns a large number of results.
+ */
 export async function discriminateReferences(userQuery, referenceChunks, model = gpt4oMini()) {
   const discriminationPrompt = `I'll give you a markdown content with a list of results from a vector search for a question.
 You will select only the references that can answer the question.
@@ -92,52 +104,45 @@ ${chunksToMarkdown(referenceChunks)}
  * @param {ChatOpenAI} model
  * @returns {Promise<{ question: string, answer: string }>}
  */
-export async function generateAnswer(query, context, model = gpt4oMini()) {
+export async function generateAnswer(query, context, model = gpt41()) {
   // TODO: disclaim that this is to assist finding information, not to provide advice.
   const prompt = `
-## Instructions  
-You are a helpful and reliable RAG chatbot assistant.
-Your task is to answer the user's question using only the information provided in the context ("IRCC documentation") below.
-The context is a compilation of text chunks extracted from the IRCC documentation, each separated by a horizontal divider (---).
-The references to the original documents are numbered and provided at the end of each chunk, just above the divider.
+Respond to the user query the best you can based only on the results of the vector search.
+Make explicit that the answer is based on your search of the IRCC documentation.
+Give your answer in short paragraphs, each with a single argument as seen in the sample below.
+Always include citations after each argument with a quote, the reference number, and a link.
+You MUST Call out any nuance or missing information in the documentation.
 
-1. Structure your answer using the Pyramid Principle: start with a clear summary of the answer, followed by supporting details, and end with references.
-2. Use Markdown formatting for clarity. Do not break the answer into multiple sections explicitly, but rather provide a single cohesive response.
-3. Cite the source for argument using the \'Reference\' provided at the end of each chunk.
-4. Place the citation immediately after the relevant statement in this format: [[<reference number>](https://example.com)].
-5. If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information or assume.
-6. Be accurate, concise, and neutral. 
-7. Avoid arguments without references.
-8. Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
-9. Responde in less than 500 chars.
+## Sample Answer
+\`\`\`md
+This is the first paragraph.
+> _"This is a citation from a reference"_ [[<reference number>](https://example.com/just-a-reference)]
 
-## Question:
+This is the second paragraph.
+> _"This is another citation"_ [[<reference number>](https://example.com/another-reference)]
 
 \`\`\`
+
+## Query:
+\`\`\`txt
 ${query}
 \`\`\`
 
-## Context:
-
+## Vector Search Results
 \`\`\`markdown
 ${context}
 \`\`\`
 `;
-  try {
-    const response = await model
-      // .withStructuredOutput(
-      //   z.object({
-      //     content: z.string().describe('Your answer in markdown format including citations'),
-      //   })
-      // )
-      .invoke(prompt);
 
-    return response.content;
-  } catch (e) {
-    _logger.appendResult(e.message, 'log', '# Error!');
-    _logger.append('## Prompt\n\n', prompt);
-    throw e;
-  }
+  const response = await model
+    // .withStructuredOutput(
+    //   z.object({
+    //     content: z.string().describe('Your answer in markdown format including citations'),
+    //   })
+    // )
+    .invoke(prompt);
+
+  return response.content;
 }
 
 export async function decomposeQuery(userQuery, model = gpt4oMini()) {
@@ -263,56 +268,60 @@ ${references}
   return content;
 }
 
-export async function ask(query, messageHistory = [], maxFollowUps = 1, logger = new SessionLogger()) {
+export async function ask(query, messageHistory = [], { maxFollowUps = 0, logger: logger = new SessionLogger() } = {}) {
   try {
     _logger = logger;
-    logger.append('Question:\n\n', '>', query);
+    logger?.append('## Question:\n\n', '>', query);
 
     // Sanitize query
     const sanitizedResponse = await sanitizeQuery(query, messageHistory);
     if (sanitizedResponse.error) {
-      logger.appendResult(sanitizedResponse.error);
+      logger?.appendResult(sanitizedResponse.error);
       return sanitizedResponse;
     }
 
     let keyQuestion = sanitizedResponse.answer;
-    logger.appendResult(keyQuestion, '', 'Sanitized Query:');
+    logger?.appendResult(keyQuestion, '', 'Sanitized Query:');
 
     let pendingQuestions = await decomposeQuery(keyQuestion);
     let finalAnswer = '';
     let refIndex = 0;
 
     while (pendingQuestions.length > 0 && maxFollowUps-- >= 0) {
+      keyQuestion = await extractKeyQuestion(sanitizedResponse.answer, pendingQuestions);
+
+      // Log key and pending questions
       const mdQuestions = pendingQuestions.filter((q) => q !== keyQuestion).map((q) => '- [ ] ' + q);
       mdQuestions.unshift(`- [x] ${keyQuestion}`);
-      logger.appendResult(mdQuestions.join('\n'), 'markdown', 'Key Questions');
+      logger?.appendResult(mdQuestions.join('\n'), 'markdown', 'Key Questions');
 
       const retrievedChunks = await vectorSearch(keyQuestion);
       const selectedChunks = await discriminateReferences(keyQuestion, retrievedChunks);
       const mdReferences = chunksToMarkdown(selectedChunks, refIndex);
       refIndex += selectedChunks.length;
-      logger.appendResult(mdReferences, 'markdown', `## References (${selectedChunks.length})`);
+      logger?.appendResult(mdReferences, 'markdown', `## References (${selectedChunks.length})`);
 
-      let answer = await generateAnswer(keyQuestion, mdReferences);
-      logger.append('## Answer\n\n', `\n\n**${keyQuestion}**\n\n`, answer);
-      logger.tick();
-      logger.insert(logger.content.pop(), -1); // swap the last to items in logger.content
+      let answer = await generateAnswer(sanitizedResponse.answer, mdReferences);
+      logger?.appendResult(answer, 'markdown', `## Answer`);
+      logger?.insert(logger?.content.pop(), -1); // swap the last to items in logger.content
       finalAnswer += '\n\n' + answer;
 
-      pendingQuestions = await evaluateFollowUp(pendingQuestions, finalAnswer);
-      if (pendingQuestions.length > 0 && maxFollowUps > 0) {
-        logger.appendResult(pendingQuestions.map((q) => '- ' + q).join('\n'), '', `# Follow-up`);
-        keyQuestion = pendingQuestions[0];
+      if (maxFollowUps > 0) {
+        pendingQuestions = await evaluateFollowUp(pendingQuestions, finalAnswer);
+        if (pendingQuestions.length > 0) {
+          logger?.appendResult(pendingQuestions.map((q) => '- [ ]' + q).join('\n'), '', `# Follow-up`);
+          keyQuestion = pendingQuestions[0];
+        }
       }
     }
 
     //TODO: dedup answer in case follow up is redundant
 
-    logger.write();
+    logger?.write();
     return { question: keyQuestion, answer: finalAnswer };
   } catch (e) {
-    logger.appendResult('Error:' + e.message, 'log');
-    logger.write();
+    logger?.appendResult('Error: ' + e.message, 'log');
+    logger?.write();
     throw e;
   }
 }

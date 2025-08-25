@@ -16,13 +16,13 @@ export class SessionLogger {
   }
 
   getElapsedTime() {
-    return ((new Date() - this.start) / 1000).toFixed(1);
+    return (new Date() - this.start) / 1000;
   }
 
-  tick() {
-    const elapsed = ((new Date() - this.lastTick) / 1000).toFixed(1);
-    this.content[this.content.length - 1] += `\n\n_(${elapsed}s)_\n\n`;
+  _tick() {
+    const delta = (new Date() - this.lastTick) / 1000;
     this.lastTick = new Date();
+    return delta;
   }
 
   append(...content) {
@@ -38,15 +38,15 @@ export class SessionLogger {
   }
 
   appendResult(content, format = '', header = '') {
-    header = header ? `${header}\n\n` : '';
+    const elapsed = this._tick().toFixed(1);
+    header = header ? `${header} (${elapsed}s)\n\n` : '';
     this.append(`${header}\`\`\`${format}\n${content}\n\`\`\``);
-    this.tick();
   }
 
   write() {
     if (this.isProduction) return;
 
-    this.prepend(`\n\n_(Total interaction time: ${this.getElapsedTime()}s)_\n\n`);
+    this.prepend(`\n\n_(Total interaction time: ${this.getElapsedTime().toFixed(1)}s)_\n\n`);
 
     // Save the ragPrompt string to a markdown file in /logs/<timestamp>.md
     const suffix = this.filenameSuffix;
