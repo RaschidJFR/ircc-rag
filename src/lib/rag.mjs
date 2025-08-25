@@ -296,7 +296,7 @@ export async function ask(query, messageHistory = [], { maxFollowUps = 0, logger
       logger?.appendResult(mdQuestions.join('\n'), 'markdown', 'Key Questions');
 
       const retrievedChunks = await vectorSearch(keyQuestion);
-      const selectedChunks = await discriminateReferences(keyQuestion, retrievedChunks);
+      const selectedChunks = retrievedChunks; // await discriminateReferences(keyQuestion, retrievedChunks);
       const mdReferences = chunksToMarkdown(selectedChunks, refIndex);
       refIndex += selectedChunks.length;
       logger?.appendResult(mdReferences, 'markdown', `## References (${selectedChunks.length})`);
