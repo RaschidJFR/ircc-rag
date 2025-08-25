@@ -32,36 +32,34 @@ const gpt41Nano = () =>
   });
 
 export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMini()) {
-  const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
+  const prompt = `Reformulate the user question to improve information retrieval.
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
   
-  If the question is a leading, reformulate it.
-  If question is not related to Canadian immigration or IRCC, raise and error.
-  In the error, politely remind the user you can only help with IRCC and Immigration-related topics.
+  If the question is not related to Canadian immigration or IRCC, raise and error and
+  politely remind the user in your answer that you can only help with IRCC and Immigration-related topics.
 
-  Make use of the chat history to understand the context and intent of the user.
-  Do not add new information or change the user's intent.
+  Use of the chat history to understand the context and intent of the user and incorporate it in your output.
   Answer only with the improved query, don't add any extra comments, explanation, or acknowledgements.
 
-  Chat History:
+  ## Chat History
   ${messageHistory.length == 0 ? 'n/a' : `\`\`\`json\n${JSON.stringify(messageHistory, null, 2)}\n\`\`\``}
   
-  Question: 
+  ## Question
   \`\`\`txt
   ${query}
   \`\`\`
   `;
 
-  const { text, error } = await model
+  const { output, error } = await model
     .withStructuredOutput(
       z.object({
-        text: z.string().describe('The reformulated query for better information retrieval'),
-        error: z.string().nullable().describe('An error message if the query cannot be reformulated'),
+        output: z.string().describe('The reformulated query or error message'),
+        error: z.boolean().describe('`true` if the query cannot be reformulated'),
       })
     )
-    .invoke(rewriteQueryPrompt);
-  return { question: query, answer: text, error };
+    .invoke(prompt);
+  return { prompt, output, error, model: model.model };
 }
 
 /**
@@ -271,13 +269,14 @@ ${references}
 export async function ask(query, messageHistory = [], { maxFollowUps = 0, logger: logger = new SessionLogger() } = {}) {
   try {
     _logger = logger;
-    logger?.append('## Question:\n\n', '>', query);
+    logger?.append('## Question\n\n', '>', query);
 
     // Sanitize query
     const sanitizedResponse = await sanitizeQuery(query, messageHistory);
     if (sanitizedResponse.error) {
-      logger?.appendResult(sanitizedResponse.error);
-      return sanitizedResponse;
+      logger?.appendResult(sanitizedResponse.prompt, 'markdown', sanitizedResponse.answer);
+      logger?.write();
+      return { answer: sanitizedResponse.output, error: sanitizedResponse.error };
     }
 
     let keyQuestion = sanitizedResponse.answer;
@@ -318,7 +317,7 @@ export async function ask(query, messageHistory = [], { maxFollowUps = 0, logger
     //TODO: dedup answer in case follow up is redundant
 
     logger?.write();
-    return { question: keyQuestion, answer: finalAnswer };
+    return { answer: finalAnswer };
   } catch (e) {
     logger?.appendResult('Error: ' + e.message, 'log');
     logger?.write();

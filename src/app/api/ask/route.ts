@@ -13,9 +13,14 @@ export async function POST(request: NextRequest) {
 
     checkLength(question);
     checkLength(history);
-    const result = await rag.ask(question, history);
+    const { answer, error } = await rag.ask(question, history);
 
-    return NextResponse.json(result);
+    if (error) {
+      return NextResponse.json({ answer: null, error: answer }, { status: 400});
+    } else {
+      return NextResponse.json({ answer }, { status: 200 });
+    }
+
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: error.message || error || 'Internal server error' }, { status: 500 });
