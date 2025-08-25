@@ -38,6 +38,7 @@ export async function vectorSearch(query, { numCandidates, limit } = { numCandid
           },
         },
       },
+      ...dedup(),
       ...getContextReconstructionAggregationStages(),
       {
         $project: {
@@ -50,6 +51,33 @@ export async function vectorSearch(query, { numCandidates, limit } = { numCandid
     .toArray();
 
   return results;
+}
+
+/**
+ * Deduplicates documents by refUrl and loc.lines.from/to.
+ * This is necessary if there are duplicate chunks created during embedding.
+ */
+function dedup() {
+  return [
+    {
+      $group: {
+        _id: {
+          refUrl: '$refUrl',
+          from: '$loc.lines.from',
+          to: '$loc.lines.to',
+        },
+        refUrl: {
+          $first: '$refUrl',
+        },
+        text: {
+          $first: '$text',
+        },
+        loc: {
+          $first: '$loc',
+        },
+      },
+    },
+  ];
 }
 
 /**
