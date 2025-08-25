@@ -10,7 +10,7 @@ let _logger = new SessionLogger();
 const gpt41 = () =>
   new ChatOpenAI({
     modelName: 'gpt-4.1',
-    maxTokens: 500,
+    maxTokens: 1000,
     apiKey: OPENAI_API_KEY,
     temperature: 0.1,
   });
@@ -98,26 +98,30 @@ ${chunksToMarkdown(referenceChunks)}
 /**
  *
  * @param {string} query Question to answer using the vector database.
- * @param {string} context Retrieved context from the vector database, formatted as markdown.
+ * @param {string} references Retrieved context from the vector database, formatted as markdown.
+ * @param {any[]} history Chat history
  * @param {ChatOpenAI} model
- * @returns {Promise<{ question: string, answer: string }>}
+ * @returns {Promise<string>} Answer in markdown format.
  */
-export async function generateAnswer(query, context, model = gpt41()) {
+export async function generateAnswer(query, references, history, model = gpt41()) {
   // TODO: disclaim that this is to assist finding information, not to provide advice.
-  const prompt = `
+  const prompt = `You are a helpful chatbot that helps users find information in the IRCC documentation.
 Respond to the user query the best you can based only on the results of the vector search.
-Make explicit that the answer is based on your search of the IRCC documentation.
+Disclaim that the answer is based on your search of the IRCC documentation.
 Give your answer in short paragraphs, each with a single argument as seen in the sample below.
-Always include citations after each argument with a quote, the reference number, and a link.
+Always include citations below each argument paragraph; include quote, the reference's number(s), and link(s).
 You MUST Call out any nuance or missing information in the documentation.
+Use the chat history to complement your answer if needed and a void being repetitive.
 
-## Sample Answer
+## Expected Answer Structure
 \`\`\`md
 This is the first paragraph.
 > _"This is a citation from a reference"_ [[<reference number>](https://example.com/just-a-reference)]
 
 This is the second paragraph.
-> _"This is another citation"_ [[<reference number>](https://example.com/another-reference)]
+> _"This is another citation...with multiple quotes"_ [[<reference number>](https://example.com/another-reference)][[<reference number>](https://example.com/yet-another-reference)]
+
+[etc...]
 
 \`\`\`
 
@@ -128,8 +132,14 @@ ${query}
 
 ## Vector Search Results
 \`\`\`markdown
-${context}
+${references}
 \`\`\`
+
+## Chat History
+\`\`\`json
+${JSON.stringify(history, null, 2)}
+\`\`\`
+
 `;
 
   const response = await model
@@ -279,7 +289,8 @@ export async function ask(query, messageHistory = [], { maxFollowUps = 0, logger
       return { answer: sanitizedResponse.output, error: sanitizedResponse.error };
     }
 
-    let keyQuestion = sanitizedResponse.answer;
+    const fullQuery = sanitizedResponse.output;
+    let keyQuestion = fullQuery;
     logger?.appendResult(keyQuestion, '', 'Sanitized Query:');
 
     let pendingQuestions = await decomposeQuery(keyQuestion);
@@ -287,21 +298,20 @@ export async function ask(query, messageHistory = [], { maxFollowUps = 0, logger
     let refIndex = 0;
 
     while (pendingQuestions.length > 0 && maxFollowUps-- >= 0) {
-      keyQuestion = await extractKeyQuestion(sanitizedResponse.answer, pendingQuestions);
+      keyQuestion = await extractKeyQuestion(fullQuery, pendingQuestions);
 
       // Log key and pending questions
       const mdQuestions = pendingQuestions.filter((q) => q !== keyQuestion).map((q) => '- [ ] ' + q);
       mdQuestions.unshift(`- [x] ${keyQuestion}`);
       logger?.appendResult(mdQuestions.join('\n'), 'markdown', 'Key Questions');
 
-      const retrievedChunks = await vectorSearch(keyQuestion);
-      const selectedChunks = retrievedChunks; // await discriminateReferences(keyQuestion, retrievedChunks);
-      const mdReferences = chunksToMarkdown(selectedChunks, refIndex);
-      refIndex += selectedChunks.length;
-      logger?.appendResult(mdReferences, 'markdown', `## References (${selectedChunks.length})`);
+      const retrievedChunks = await vectorSearch(fullQuery);
+      const mdReferences = chunksToMarkdown(retrievedChunks, refIndex);
+      refIndex += retrievedChunks.length;
+      logger?.appendResult(mdReferences, 'markdown', `## References (${retrievedChunks.length})`);
 
-      let answer = await generateAnswer(sanitizedResponse.answer, mdReferences);
-      logger?.appendResult(answer, 'markdown', `## Answer`);
+      const answer = await generateAnswer(fullQuery, mdReferences, messageHistory);
+      logger?.appendResult(answer, 'markdown', `## Answer\n${fullQuery}`);
       logger?.insert(logger?.content.pop(), -1); // swap the last to items in logger.content
       finalAnswer += '\n\n' + answer;
 
