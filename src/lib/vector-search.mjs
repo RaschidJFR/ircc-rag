@@ -17,40 +17,38 @@ export async function vectorSearch(query, { numCandidates, limit } = { numCandid
 
   // Any change to these parameters alters the amount of results passed to the LLM,
   // thus change the context and the quality of the answer.
-  const results = await collection
-    .aggregate([
-      {
-        $vectorSearch: {
-          queryVector: embeddings,
-          path: 'embedding',
-          index: VECTOR_INDEX_NAME,
-          numCandidates,
-          limit,
-        },
+  const pipeline = [
+    {
+      $vectorSearch: {
+        queryVector: embeddings,
+        path: 'embedding',
+        index: VECTOR_INDEX_NAME,
+        numCandidates,
+        limit,
       },
-      // Omit documents without a refUrl.
-      {
-        $match: {
-          refUrl: {
-            $not: {
-              $in: [null, '', false],
-            },
+    },
+    // Omit documents without a refUrl.
+    {
+      $match: {
+        refUrl: {
+          $not: {
+            $in: [null, '', false],
           },
         },
       },
-      ...dedup(),
-      ...getContextReconstructionAggregationStages(),
-      {
-        $project: {
-          _id: 0,
-          refUrl: 1,
-          text: 1,
-        },
+    },
+    ...dedup(),
+    ...getContextReconstructionAggregationStages(),
+    {
+      $project: {
+        _id: 0,
+        refUrl: 1,
+        text: 1,
       },
-    ])
-    .toArray();
+    },
+  ];
 
-  return results;
+  return collection.aggregate(pipeline).toArray();
 }
 
 /**
@@ -123,7 +121,7 @@ function getContextReconstructionAggregationStages() {
                   },
                   // Skip chunks already included in the previous results.
                   {
-                    $ne: ['$loc.lines.from', '$$minLoc'],
+                    $lt: ['$loc.lines.from', '$$minLoc'],
                   },
                 ],
               },
@@ -162,7 +160,7 @@ function getContextReconstructionAggregationStages() {
       $project: {
         _id: 0,
         text: {
-          $concat: ['$mainTopic.text', '\n\n\\[...\\]\n\n* * * \n\n', '$text'],
+          $concat: [{ $ifNull: ['$mainTopic.text', ''] }, '\n\n\\[...\\]\n\n* * * \n\n', '$text'],
         },
         refUrl: '$_id',
       },
@@ -193,7 +191,7 @@ export function chunksToMarkdown(chunks, startIndex = 0) {
       const SEPARATOR = '\n\n\\[...\\]\n\n* * * \n\n';
       return `${mainTopic ? mainTopic + SEPARATOR : ''}${text}\n\nReference [${
         i + 1 + startIndex
-      }]: ${refUrl}\n-----------------------------\n\n`;
+      }]: ${refUrl}\n\n-----------------------------\n\n`;
     })
     .join('\n');
 }

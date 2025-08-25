@@ -5,14 +5,10 @@ const CHAR_LIMIT = 1500;
 
 export async function POST(request: NextRequest) {
   try {
+    // TODO: deprecate `question` and `history` in favor of `query[]` to align with LLM API conventions.
     const { question, history } = await request.json();
     if (!question) {
-      return NextResponse.json(
-        { error: 'Invalid input: expected {question, history[]}' },
-        {
-          status: 400,
-        }
-      );
+      return NextResponse.json({ error: 'Invalid input: expected {question, history[]}' }, { status: 400 });
     }
 
     checkLength(question);
@@ -21,13 +17,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error('Error in /ask:', error);
-    return NextResponse.json(
-      { error: error.message || error || 'Internal server error' },
-      {
-        status: 500,
-      }
-    );
+    console.error(error);
+    return NextResponse.json({ error: error.message || error || 'Internal server error' }, { status: 500 });
   } finally {
     rag.closeConnection();
   }
