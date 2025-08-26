@@ -30,7 +30,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onLinkClick }
                 components={{
                   a: ({ href, children }) => (
                     <Link
-                      href={`/?show=${encodeURI(href)}`}
+                      href={`/?show=${encodeURIComponent(href)}`}
                       className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
                       onClick={() => onLinkClick?.()}
                     >
