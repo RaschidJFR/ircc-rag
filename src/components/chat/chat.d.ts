@@ -1,3 +1,5 @@
+import { AskApiResponse } from 'lib/common/types';
+
 export interface ChatMessage {
   id: string;
   type: 'user' | 'bot';
@@ -5,8 +7,4 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
-export interface ApiResponse {
-  question: string;
-  answer: string;
-  error: string | false;
-}
+export type ApiResponse = AskApiResponse;

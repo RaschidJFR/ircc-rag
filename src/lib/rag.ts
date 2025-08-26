@@ -3,7 +3,9 @@ import { OPENAI_API_KEY } from './vars.mjs';
 import * as z from 'zod';
 import { vectorSearch, chunksToMarkdown, ChunkDocument as DocumentChunk } from './vector-search';
 import { SessionLogger } from './logger';
-import { ChatMessage, RAGResponseParagraph as RagResponseParagraph } from './types.d';
+import { ChatMessage, RAGResponseParagraph as RagResponseParagraph } from './common/types';
+import { parseAnswer } from './common/tools';
+export { closeConnection } from './vector-search';
 
 let _logger = new SessionLogger();
 
@@ -36,8 +38,8 @@ export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMin
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
   
-  If the question is not related to Canadian immigration or IRCC, raise and error and
-  politely remind the user in your answer that you can only help with IRCC and Immigration-related topics.
+  If the question is not related to Canadian immigration or IRCC, raise and error in which you
+  politely remind the user that you can only help with IRCC and Immigration-related topics.
 
   Use of the chat history to understand the context and intent of the user and incorporate it in your output.
   Answer only with the improved query, don't add any extra comments, explanation, or acknowledgements.
@@ -54,8 +56,8 @@ export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMin
   const { output, error } = await model
     .withStructuredOutput(
       z.object({
-        output: z.string().describe('The reformulated query or error message'),
-        error: z.boolean().describe('`true` if the query cannot be reformulated'),
+        output: z.string().nullish().describe('The reformulated query. Empty if an error is raised'),
+        error: z.string().describe('The error, if any'),
       })
     )
     .invoke(prompt);
@@ -66,7 +68,7 @@ export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMin
  * This function filters the references based on their relevance to the user's query.
  * It is recommended in the case when the vector search returns a large number of results.
  */
-export async function discriminateReferences(userQuery, referenceChunks, model = gpt4oMini()) {
+export async function discriminateReferences(userQuery: string, referenceChunks: DocumentChunk[], model = gpt4oMini()) {
   const discriminationPrompt = `I'll give you a markdown content with a list of results from a vector search for a question.
 You will select only the references that can answer the question.
 
@@ -95,35 +97,14 @@ ${chunksToMarkdown(referenceChunks)}
   return referenceChunks.filter((_, i) => indexes.includes(i + 1));
 }
 
-/**
- *
- * @param {string} query Question to answer using the vector database.
- * @param {string} references Retrieved context from the vector database, formatted as markdown.
- * @param {any[]} history Chat history
- * @param {ChatOpenAI} model
- * @returns {Promise<string>} Answer in markdown format.
- */
-export async function generateAnswer(query, references, history, model = gpt41()) {
-  // TODO: disclaim that this is to assist finding information, not to provide advice.
+export async function generateAnswer(query: string, references: string, history: ChatMessage[], model = gpt41()) {
   const prompt = `You are a helpful chatbot that helps users find information in the IRCC documentation.
 Respond to the user query the best you can based only on the results of the vector search.
 Disclaim that the answer is based on your search of the IRCC documentation.
-Give your answer in short paragraphs, each with a single argument as seen in the sample below.
-Always include citations below each argument paragraph; include quote, the reference's number(s), and link(s).
+Give your answer in short paragraphs, each with a single argument.
+Always include citations for each paragraph; include quote, the reference's number(s), and reference url(s).
 You MUST Call out any nuance or missing information in the documentation.
 Use the chat history to complement your answer if needed and a void being repetitive.
-
-## Expected Answer Structure
-\`\`\`md
-This is the first paragraph.
-> _"This is a citation from a reference"_ [[<reference number>](https://example.com/just-a-reference)]
-
-This is the second paragraph.
-> _"This is another citation...with multiple quotes"_ [[<reference number>](https://example.com/another-reference)][[<reference number>](https://example.com/yet-another-reference)]
-
-[etc...]
-
-\`\`\`
 
 ## Query:
 \`\`\`txt
@@ -142,18 +123,31 @@ ${JSON.stringify(history, null, 2)}
 
 `;
 
-  const { content } = await model
-    // .withStructuredOutput(
-    //   z.object({
-    //     content: z.string().describe('Your answer in markdown format including citations'),
-    //   })
-    // )
+  const zReference = z.object({
+    refNum: z.string().describe('A references number of the corresponding citation'),
+    url: z.string().describe('The URL of the reference'),
+    quoteText: z.string().describe('The quote from the reference that supports the paragraph'),
+  });
+
+  const zParagraph = z.object({
+    text: z.string().describe('A paragraph in the answer excluding citations. Max 400 chars'),
+    references: z.array(zReference).describe('Array of references for this paragraph'),
+  });
+
+  const { answer } = await model
+    .withStructuredOutput(
+      z
+        .object({
+          answer: z.array(zParagraph).describe('Array of answer paragraphs'),
+        })
+        .required()
+    )
     .invoke(prompt);
 
-  return content;
+  return answer as RagResponseParagraph[];
 }
 
-export async function decomposeQuery(userQuery, model = gpt4oMini()) {
+export async function decomposeQuery(userQuery: string, model = gpt4oMini()) {
   const questionExtractionPrompt = `The user provided a long, informal story or question. Your task is:
 1. Identify and extract all explicit questions they are asking.
 2. Rewrite each one as a clear, self-contained question.
@@ -184,7 +178,7 @@ ${userQuery}
   return questions;
 }
 
-export async function extractKeyQuestion(userQuery, questionList, model = gpt41Nano()) {
+export async function extractKeyQuestion(userQuery: string, questionList: string[], model = gpt41Nano()) {
   const questionDiscriminationPrompt = `From the following list of questions, select the most relevant one to best address the user's main concern.
 Do not add new questions or alter the existing ones.
 If the list of questions provided is empty, return an empty string.
@@ -213,7 +207,11 @@ ${questionList.map((q) => `- ${q}`).join('\n')}
   return content;
 }
 
-export async function ask(query, messageHistory = [], { logger: logger = new SessionLogger() } = {}) {
+export async function ask(
+  query: string,
+  messageHistory: ChatMessage[] = [],
+  { logger: logger = new SessionLogger() } = {}
+) {
   try {
     _logger = logger;
     logger?.append('## Question\n\n', '>', query);
@@ -221,9 +219,9 @@ export async function ask(query, messageHistory = [], { logger: logger = new Ses
     // Sanitize query
     const sanitizedResponse = await sanitizeQuery(query, messageHistory);
     if (sanitizedResponse.error) {
-      logger?.appendResult(sanitizedResponse.prompt, 'markdown', sanitizedResponse.answer);
+      logger?.appendResult(sanitizedResponse.prompt, 'markdown', sanitizedResponse.error);
       logger?.write();
-      return { answer: sanitizedResponse.output, error: sanitizedResponse.error };
+      return { error: sanitizedResponse.error };
     }
 
     query = sanitizedResponse.output;
@@ -234,7 +232,7 @@ export async function ask(query, messageHistory = [], { logger: logger = new Ses
     logger?.appendResult(mdReferences, 'markdown', `## References (${chunks.length})`);
 
     const answer = await generateAnswer(query, mdReferences, messageHistory);
-    logger?.appendResult(answer, 'markdown', `## Answer`);
+    logger?.appendResult(parseAnswer(answer), 'markdown', `## Answer`);
 
     logger?.insert(logger?.content.pop(), -1); // swap the last to items in logger
     logger?.write();
