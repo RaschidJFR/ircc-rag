@@ -60,7 +60,8 @@ npm run cli
   - [ ] Create a cron job to update data periodically
 - [ ] Provide references
   - [x] Ensure links to all relevant sources are included in the response
-  - [ ] Support text fragments in browser
+  - [x] Support text fragments in browser
+  - [x] Quote reference text
 - [ ] UI/UX
   - [x] Build and deploy a mobile-friendly web UI
   - [ ] Explore creating a Chrome extension for better integration with IRCC

@@ -7,7 +7,18 @@ const COLLECTION_NAME = 'chunks';
 const mongoClient = new MongoClient(MONGODB_URI, {});
 const collection = mongoClient.db(DB_NAME).collection(COLLECTION_NAME);
 
-export async function vectorSearch(query, { numCandidates, limit } = { numCandidates: 500, limit: 10 }) {
+interface VectorSearchResults {
+  refUrl: string;
+  text: string;
+  mainTopic?: string;
+}
+
+export type ChunkDocument = Pick<VectorSearchResults, 'refUrl' | 'text'>;
+
+export async function vectorSearch(
+  query: string,
+  { numCandidates, limit } = { numCandidates: 500, limit: 10 }
+): Promise<VectorSearchResults[]> {
   const embeddings = await new OpenAIEmbeddings({
     openAIApiKey: OPENAI_API_KEY,
     model: EMBEDDING_MODEL,
@@ -48,7 +59,7 @@ export async function vectorSearch(query, { numCandidates, limit } = { numCandid
     },
   ];
 
-  return collection.aggregate(pipeline).toArray();
+  return collection.aggregate(pipeline).toArray() as Promise<VectorSearchResults[]>;
 }
 
 /**
@@ -80,7 +91,7 @@ function dedup() {
 
 /**
  * This aggregation pipeline merges documents resulting from the vector search by refUrl and adds the field `mainTopic`.
- * @returns {Array<Object>} Aggregation pipeline stages for reconstructing context from related documents.
+ * @returns Aggregation pipeline stages for reconstructing context from related documents.
  */
 function getContextReconstructionAggregationStages() {
   return [
@@ -169,25 +180,11 @@ function getContextReconstructionAggregationStages() {
 }
 
 /**
- * Converts an array of chunks into a Markdown-formatted string.
- *
- * @param {Array<Object>} chunks - An array of chunk objects to be converted.
- * @param {string} chunks[].refUrl - The reference URL associated with the chunk.
- * @param {string} chunks[].text - The text content of the chunk.
- * @param {string?} chunks[].mainTopic - The initial text chunk in the related full document.
- * @returns {string} A Markdown-formatted string containing the chunk text and references.
+ * @param startIndex Index to start numbering the references from.
  */
-export function chunksToMarkdown(chunks, startIndex = 0) {
+export function chunksToMarkdown(chunks: VectorSearchResults[], startIndex = 0) {
   return chunks
     .map(({ refUrl, text, mainTopic }, i) => {
-      // TO-DO: implement text fragment highlight
-      // const firstSentence = removeMd(text).match(/[\w, -]{12,}/).at(0);
-      // const lastSentence = removeMd(text).match(/[\w, -]{12,}/g).at(-1);
-      // let url = refUrl;
-      // if (firstSentence && lastSentence && firstSentence !== lastSentence) {
-      //   url = `${refUrl}#:~:text=${encodeURI(firstSentence)},${encodeURI(lastSentence)}`;
-      // }
-
       const SEPARATOR = '\n\n\\[...\\]\n\n* * * \n\n';
       return `${mainTopic ? mainTopic + SEPARATOR : ''}${text}\n\nReference [${
         i + 1 + startIndex
@@ -201,6 +198,9 @@ async function openMongoConnection() {
   return mongoClient;
 }
 
+/**
+ * Closes the MongoDB connection.
+ */
 export async function closeConnection() {
   await mongoClient?.close();
 }

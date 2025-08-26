@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { vectorSearch, chunksToMarkdown } from 'lib/vector-search.mjs';
+import { vectorSearch, chunksToMarkdown } from 'lib/vector-search';
 import { marked } from 'marked';
 
 type FormatOptions = 'html' | 'json' | 'markdown';
