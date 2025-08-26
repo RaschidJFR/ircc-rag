@@ -142,7 +142,7 @@ ${JSON.stringify(history, null, 2)}
 
 `;
 
-  const response = await model
+  const { content } = await model
     // .withStructuredOutput(
     //   z.object({
     //     content: z.string().describe('Your answer in markdown format including citations'),
@@ -150,7 +150,7 @@ ${JSON.stringify(history, null, 2)}
     // )
     .invoke(prompt);
 
-  return response.content;
+  return content;
 }
 
 export async function decomposeQuery(userQuery, model = gpt4oMini()) {
