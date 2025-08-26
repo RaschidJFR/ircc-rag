@@ -6,7 +6,9 @@ export function parseAnswer(answer: RAGResponseParagraph[]) {
       const references =
         paragraph.references
           ?.map(({ url, quoteText, refNum }) => {
-            return `>_"${quoteText}"_ [[${refNum}]](${url})`;
+            const firstSentence = quoteText.match(/[^\n\,\.\!\?\:\;\-]{10,}/)?.[0].trim();
+            const anchor = firstSentence ? `#:~:text=${encodeURIComponent(firstSentence)}` : '';
+            return `>_"${quoteText}"_ [[${refNum}]](${url}${anchor})`;
           })
           .join('\n\n') || '';
 

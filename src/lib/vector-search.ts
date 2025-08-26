@@ -185,14 +185,6 @@ function getContextReconstructionAggregationStages() {
 export function chunksToMarkdown(chunks: VectorSearchResults[], startIndex = 0) {
   return chunks
     .map(({ refUrl, text, mainTopic }, i) => {
-      // TO-DO: implement text fragment highlight
-      // const firstSentence = removeMd(text).match(/[\w, -]{12,}/).at(0);
-      // const lastSentence = removeMd(text).match(/[\w, -]{12,}/g).at(-1);
-      // let url = refUrl;
-      // if (firstSentence && lastSentence && firstSentence !== lastSentence) {
-      //   url = `${refUrl}#:~:text=${encodeURI(firstSentence)},${encodeURI(lastSentence)}`;
-      // }
-
       const SEPARATOR = '\n\n\\[...\\]\n\n* * * \n\n';
       return `${mainTopic ? mainTopic + SEPARATOR : ''}${text}\n\nReference [${
         i + 1 + startIndex

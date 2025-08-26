@@ -8,8 +8,7 @@ const CHAR_LIMIT = 1500;
 export async function POST(request: NextRequest) {
   try {
     // TODO: deprecate `question` and `history` in favor of `query[]` to align with LLM API conventions.
-    let { question, history, format } = (await request.json()) as AskApiRequestParams;
-    format = format || 'json';
+    const { question, history = [], format = 'json' } = (await request.json()) as AskApiRequestParams;
     if (!question) {
       return NextResponse.json({ error: 'Invalid input: expected {question, history[]}' }, { status: 400 });
     }
