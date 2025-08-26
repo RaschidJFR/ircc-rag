@@ -1,225 +1,247 @@
-import { ChatOpenAI, OpenAIEmbeddings } from '@langchain/openai';
-import { MongoClient } from 'mongodb';
-import { MONGODB_URI, OPENAI_API_KEY, EMBEDDING_MODEL, VECTOR_INDEX_NAME, LLM_MODEL } from './vars.mjs';
+import { ChatOpenAI } from '@langchain/openai';
+import { OPENAI_API_KEY } from './vars.mjs';
 import * as z from 'zod';
-import fs from 'fs';
-import path from 'path';
+import { vectorSearch, chunksToMarkdown } from './vector-search.mjs';
+export { closeConnection } from './vector-search.mjs';
+import { SessionLogger } from './logger.mjs';
 
-const isProduction = process.env.NODE_ENV === 'production';
+let _logger = new SessionLogger();
 
-const gpt = new ChatOpenAI({
-  modelName: LLM_MODEL,
-  maxTokens: 1000,
-  apiKey: OPENAI_API_KEY,
-  temperature: 0.1,
-});
+const gpt41 = () =>
+  new ChatOpenAI({
+    modelName: 'gpt-4.1',
+    maxTokens: 1000,
+    apiKey: OPENAI_API_KEY,
+    temperature: 0.1,
+  });
 
-const DB_NAME = 'IRCC_RAG';
-const COLLECTION_NAME = 'chunks';
-const mongoClient = new MongoClient(MONGODB_URI, {});
-const collection = mongoClient.db(DB_NAME).collection(COLLECTION_NAME);
+const gpt4oMini = () =>
+  new ChatOpenAI({
+    modelName: 'gpt-4o-mini',
+    maxTokens: 500,
+    apiKey: OPENAI_API_KEY,
+    temperature: 0.1,
+  });
 
-async function rewriteQuery(query, messageHistory = []) {
-  const rewriteQueryPrompt = `You are an assistant that reformulates user questions to improve information retrieval.
+const gpt41Nano = () =>
+  new ChatOpenAI({
+    modelName: 'gpt-4.1-nano',
+    maxTokens: 500,
+    apiKey: OPENAI_API_KEY,
+    temperature: 0.1,
+  });
+
+export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMini()) {
+  const prompt = `Reformulate the user question to improve information retrieval.
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
   
-  If the question is a leading, reformulate it.
-  If question is not related to Canadian immigration or IRCC, raise and error.
-  In the error, politely remind the user you can only help with IRCC and Immigration-related topics.
+  If the question is not related to Canadian immigration or IRCC, raise and error and
+  politely remind the user in your answer that you can only help with IRCC and Immigration-related topics.
 
-  Make use of the chat history to understand the context and intent of the user.
-  Do not add new information or change the user's intent.
+  Use of the chat history to understand the context and intent of the user and incorporate it in your output.
   Answer only with the improved query, don't add any extra comments, explanation, or acknowledgements.
 
-  Chat History:
+  ## Chat History
   ${messageHistory.length == 0 ? 'n/a' : `\`\`\`json\n${JSON.stringify(messageHistory, null, 2)}\n\`\`\``}
   
-  Question: 
+  ## Question
   \`\`\`txt
   ${query}
   \`\`\`
   `;
 
-  const { text, error } = await gpt
+  const { output, error } = await model
     .withStructuredOutput(
       z.object({
-        text: z.string().describe('The reformulated query for better information retrieval'),
-        error: z.string().nullable().describe('An error message if the query cannot be reformulated'),
+        output: z.string().describe('The reformulated query or error message'),
+        error: z.boolean().describe('`true` if the query cannot be reformulated'),
       })
     )
-    .invoke(rewriteQueryPrompt);
-  return { question: query, answer: text, error };
+    .invoke(prompt);
+  return { prompt, output, error, model: model.model };
 }
 
-async function RAG(query) {
-  const results = await vectorSearch(query);
+/**
+ * This function filters the references based on their relevance to the user's query.
+ * It is recommended in the case when the vector search returns a large number of results.
+ */
+export async function discriminateReferences(userQuery, referenceChunks, model = gpt4oMini()) {
+  const discriminationPrompt = `I'll give you a markdown content with a list of results from a vector search for a question.
+You will select only the references that can answer the question.
 
-  const ragPrompt = `
-## Instructions  
-You are a helpful and reliable assistant.
-Your task is to answer the user's question using only the information provided in the context ("IRCC documentation") below.
-The context is a compilation of text chunks extracted from the IRCC documentation, each separated by a horizontal divider (---).
-The references to the original documents are numbered and provided at the end of each chunk, just above the divider.
+1. Check the top section of each reference to understand whether the content is related to the specific user's scenario. Discard the reference if it's not.
+2. Return an array containing the selected references' numbers.
 
-Structure your answer using the Pyramid Principle: start with a clear summary of the answer, followed by supporting details, and end with references.
-Use Markdown formatting for clarity. Do not break the answer into multiple sections explicitly, but rather provide a single cohesive response.
+**Question:** ${userQuery}
 
-Cite the source for each specific data point or fact using the \'Reference\' provided in the IRCC documentation.
-Place the citation immediately after the relevant statement in this format: [[<reference number>](https://example.com)].
+**Chunks:**
 
-If the IRCC documentation does not contain a clear answer, say so honestly. Do not guess or fabricate information.
-Be accurate, concise, and neutral in tone. 
-Highlight any potential nuances in the answer that depend on the user's specific scenario and conditions.
+\`\`\`markdown
+${chunksToMarkdown(referenceChunks)}
+\`\`\`
+`;
 
-## Question:
+  const { indexes } = await model
+    .withStructuredOutput(
+      z.object({
+        indexes: z
+          .array(z.number())
+          .describe('An array of numbers representing the selected references from the chunks'),
+      })
+    )
+    .invoke(discriminationPrompt);
 
+  return referenceChunks.filter((_, i) => indexes.includes(i + 1));
+}
+
+/**
+ *
+ * @param {string} query Question to answer using the vector database.
+ * @param {string} references Retrieved context from the vector database, formatted as markdown.
+ * @param {any[]} history Chat history
+ * @param {ChatOpenAI} model
+ * @returns {Promise<string>} Answer in markdown format.
+ */
+export async function generateAnswer(query, references, history, model = gpt41()) {
+  // TODO: disclaim that this is to assist finding information, not to provide advice.
+  const prompt = `You are a helpful chatbot that helps users find information in the IRCC documentation.
+Respond to the user query the best you can based only on the results of the vector search.
+Disclaim that the answer is based on your search of the IRCC documentation.
+Give your answer in short paragraphs, each with a single argument as seen in the sample below.
+Always include citations below each argument paragraph; include quote, the reference's number(s), and link(s).
+You MUST Call out any nuance or missing information in the documentation.
+Use the chat history to complement your answer if needed and a void being repetitive.
+
+## Expected Answer Structure
+\`\`\`md
+This is the first paragraph.
+> _"This is a citation from a reference"_ [[<reference number>](https://example.com/just-a-reference)]
+
+This is the second paragraph.
+> _"This is another citation...with multiple quotes"_ [[<reference number>](https://example.com/another-reference)][[<reference number>](https://example.com/yet-another-reference)]
+
+[etc...]
+
+\`\`\`
+
+## Query:
 \`\`\`txt
 ${query}
 \`\`\`
 
-## Context:
-
+## Vector Search Results
 \`\`\`markdown
-${chunksToMarkdown(results)}
+${references}
+\`\`\`
+
+## Chat History
+\`\`\`json
+${JSON.stringify(history, null, 2)}
+\`\`\`
+
+`;
+
+  const { content } = await model
+    // .withStructuredOutput(
+    //   z.object({
+    //     content: z.string().describe('Your answer in markdown format including citations'),
+    //   })
+    // )
+    .invoke(prompt);
+
+  return content;
+}
+
+export async function decomposeQuery(userQuery, model = gpt4oMini()) {
+  const questionExtractionPrompt = `The user provided a long, informal story or question. Your task is:
+1. Identify and extract all explicit questions they are asking.
+2. Rewrite each one as a clear, self-contained question.
+3. Condense the result into the *smallest possible set of non-overlapping, atomic questions* that fully capture the user's intent.  
+4. Avoid joined questions what use "and" or colon (","), or questions that are too broad.
+5. Eliminate redundancy — avoid rephrasing the same issue multiple times.  
+6. Avoid questions not clearly stated in the user query.
+
+**User question:**
+
+\`\`\`
+${userQuery}
 \`\`\`
 `;
 
-  const response = await gpt
+  const { questions } = await model
     .withStructuredOutput(
       z.object({
-        question: z.string().describe('The original user question'),
-        answer: z.string().describe('Your answer in markdown format including citations'),
+        questions: z
+          .array(z.string())
+          .describe(
+            'A list of questions derived from the user query, sorted by relevance top to bottom, each with less than 140 chars.'
+          ),
       })
     )
-    .invoke(ragPrompt);
+    .invoke(questionExtractionPrompt);
 
-  logInteractionResults(ragPrompt, response);
-
-  return response;
+  return questions;
 }
 
-async function logInteractionResults(ragPrompt, responseObject) {
-  if (isProduction) return;
-  // Save the ragPrompt string to a markdown file in /logs/<timestamp>.md
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const logFileName = `logs/${timestamp}.md`;
-  const logContent = `**${responseObject.question}**
+export async function extractKeyQuestion(userQuery, questionList, model = gpt41Nano()) {
+  const questionDiscriminationPrompt = `From the following list of questions, select the most relevant one to best address the user's main concern.
+Do not add new questions or alter the existing ones.
+If the list of questions provided is empty, return an empty string.
+Return an empty string if you cannot determine the key question.
 
-  \`\`\`markdown
-  ${responseObject.answer}
-  \`\`\`
+User query:
 
-  # RAG Prompt
-  ${ragPrompt}
+\`\`\`
+${userQuery}
+\`\`\`
+
+List of questions:
+\`\`\`
+${questionList.map((q) => `- ${q}`).join('\n')}
+\`\`\`
 `;
 
-  const logDir = path.dirname(logFileName);
-  if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
+  const { content } = await model
+    .withStructuredOutput(
+      z.object({
+        content: z.string().describe('The key question selected from the list'),
+      })
+    )
+    .invoke(questionDiscriminationPrompt);
+
+  return content;
+}
+
+export async function ask(query, messageHistory = [], { logger: logger = new SessionLogger() } = {}) {
+  try {
+    _logger = logger;
+    logger?.append('## Question\n\n', '>', query);
+
+    // Sanitize query
+    const sanitizedResponse = await sanitizeQuery(query, messageHistory);
+    if (sanitizedResponse.error) {
+      logger?.appendResult(sanitizedResponse.prompt, 'markdown', sanitizedResponse.answer);
+      logger?.write();
+      return { answer: sanitizedResponse.output, error: sanitizedResponse.error };
+    }
+
+    query = sanitizedResponse.output;
+    logger?.appendResult(query, 'txt', 'Sanitized Query');
+
+    const chunks = await vectorSearch(query);
+    const mdReferences = chunksToMarkdown(chunks);
+    logger?.appendResult(mdReferences, 'markdown', `## References (${chunks.length})`);
+
+    const answer = await generateAnswer(query, mdReferences, messageHistory);
+    logger?.appendResult(answer, 'markdown', `## Answer`);
+
+    logger?.insert(logger?.content.pop(), -1); // swap the last to items in logger
+    logger?.write();
+    return { answer };
+  } catch (e) {
+    logger?.appendResult(e.message, 'txt', 'Error');
+    logger?.write();
+    throw e;
   }
-  fs.writeFileSync(logFileName, logContent, 'utf8');
-}
-
-async function vectorSearch(query) {
-  const embeddings = await new OpenAIEmbeddings({
-    openAIApiKey: OPENAI_API_KEY,
-    model: EMBEDDING_MODEL,
-  }).embedQuery(query);
-
-  const relevantReferences = await collection
-    .aggregate([
-      {
-        // Any change to these parameters alters the amount of results passed to the LLM,
-        // thus change the context and the quality of the answer.
-        $vectorSearch: {
-          queryVector: embeddings,
-          path: 'embedding',
-          numCandidates: 500,
-          index: VECTOR_INDEX_NAME,
-          limit: 5,
-        },
-      },
-      {
-        $project: {
-          refUrl: 1,
-        },
-      },
-    ])
-    .toArray();
-
-  const completeReferences = await collection
-    .aggregate([
-      {
-        $match: {
-          refUrl: {
-            $in: relevantReferences.map(({ refUrl }) => refUrl),
-          },
-        },
-      },
-      {
-        $sort: {
-          'loc.lines.from': 1,
-        },
-      },
-      {
-        $group: {
-          _id: '$refUrl',
-          text: {
-            $push: '$text',
-          },
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          refUrl: '$_id',
-          text: {
-            $reduce: {
-              input: '$text',
-              initialValue: '',
-              in: {
-                $concat: ['$$value', '$$this'],
-              },
-            },
-          },
-        },
-      },
-    ])
-    .toArray();
-
-  return completeReferences;
-}
-
-function chunksToMarkdown(chunks) {
-  return chunks
-    .map(({ refUrl, text }, i) => {
-      // TO-DO: implement text fragment highlight
-      // const firstSentence = removeMd(text).match(/[\w, -]{12,}/).at(0);
-      // const lastSentence = removeMd(text).match(/[\w, -]{12,}/g).at(-1);
-      // let url = refUrl;
-      // if (firstSentence && lastSentence && firstSentence !== lastSentence) {
-      //   url = `${refUrl}#:~:text=${encodeURI(firstSentence)},${encodeURI(lastSentence)}`;
-      // }
-      return `${text}\n\nReference [${i + 1}]: ${refUrl}\n-----------------------------\n\n`;
-    })
-    .join('\n');
-}
-
-async function openMongoConnection() {
-  await mongoClient.connect();
-  return mongoClient;
-}
-
-export async function ask(query, messageHistory = []) {
-  const response = await rewriteQuery(query, messageHistory);
-  if (response.error) {
-    return response;
-  }
-  await openMongoConnection();
-  return RAG(response.answer);
-}
-
-export async function closeConnection() {
-  await mongoClient?.close();
 }

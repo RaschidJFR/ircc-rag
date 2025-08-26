@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
       // If path starts with '/', assume it's relative to canada.ca
       path = `https://canada.ca${path.startsWith('/') ? path : '/' + path}`;
     
+      // TO DO: support *.gc.ca
       // reject if the path is for a domain other than canada.ca
     } else if (!/^([a-z0-9-]+\.)*canada\.ca$/i.test(hostname)) {
         return new Response(`Invalid domain: ${hostname}`, {
