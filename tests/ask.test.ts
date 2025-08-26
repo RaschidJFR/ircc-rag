@@ -7,7 +7,7 @@ vi.mock('lib/rag.mjs', () => ({
 }));
 
 import { POST } from 'app/api/ask/route';
-import * as rag from 'lib/rag.mjs';
+import * as rag from 'lib/rag';
 import { NextRequest } from 'next/server';
 
 function makeReq(body: any): NextRequest {

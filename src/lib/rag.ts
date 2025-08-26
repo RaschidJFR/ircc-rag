@@ -1,9 +1,9 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { OPENAI_API_KEY } from './vars.mjs';
 import * as z from 'zod';
-import { vectorSearch, chunksToMarkdown } from './vector-search.mjs';
-export { closeConnection } from './vector-search.mjs';
-import { SessionLogger } from './logger.mjs';
+import { vectorSearch, chunksToMarkdown, ChunkDocument as DocumentChunk } from './vector-search';
+import { SessionLogger } from './logger';
+import { ChatMessage, RAGResponseParagraph as RagResponseParagraph } from './types.d';
 
 let _logger = new SessionLogger();
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import * as rag from 'lib/rag.mjs';
+import * as rag from 'lib/rag';
 
 const CHAR_LIMIT = 1500;
 
