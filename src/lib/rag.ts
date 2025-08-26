@@ -7,8 +7,6 @@ import { ChatMessage, RAGResponseParagraph as RagResponseParagraph } from './com
 import { parseAnswer } from './common/tools';
 export { closeConnection } from './vector-search';
 
-let _logger = new SessionLogger();
-
 const gpt41 = () =>
   new ChatOpenAI({
     modelName: 'gpt-4.1',
@@ -33,7 +31,7 @@ const gpt41Nano = () =>
     temperature: 0.1,
   });
 
-export async function sanitizeQuery(query, messageHistory = [], model = gpt4oMini()) {
+export async function sanitizeQuery(query: string, messageHistory = [], model = gpt4oMini()) {
   const prompt = `Reformulate the user question to improve information retrieval.
   Your goal is to produce a semantically clear and self-contained version of the original query, 
   using precise terminology and expanding abbreviations or vague expressions. 
@@ -207,13 +205,8 @@ ${questionList.map((q) => `- ${q}`).join('\n')}
   return content;
 }
 
-export async function ask(
-  query: string,
-  messageHistory: ChatMessage[] = [],
-  { logger: logger = new SessionLogger() } = {}
-) {
+export async function ask(query: string, messageHistory = [], { logger: logger = new SessionLogger() } = {}) {
   try {
-    _logger = logger;
     logger?.append('## Question\n\n', '>', query);
 
     // Sanitize query

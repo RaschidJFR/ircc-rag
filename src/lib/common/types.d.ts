@@ -21,7 +21,10 @@ export type AskApiRequestParams = {
   /** @deprecated */
   question?: string;
   /** @deprecated */
-  history?: any[];
+  history?: {
+    question?: string;
+    answer?: string;
+  }[];
   query?: ChatMessage[];
-  format: 'json' | 'markdown'
+  format: 'json' | 'markdown';
 };

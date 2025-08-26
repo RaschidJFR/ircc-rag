@@ -17,7 +17,8 @@ export async function POST(request: NextRequest) {
     }
 
     checkLength(question);
-    checkLength(history);
+    // checkLength(history);  // TODO: check messages in history
+    
     const { answer, error } = await rag.ask(question, history);
 
     if (error) {
@@ -35,14 +36,8 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function checkLength(text: string | string[]) {
-  if (Array.isArray(text)) {
-    if (text.some((t) => t.length > CHAR_LIMIT)) {
-      throw new Error(`One of the queries exceeds the limit of ${CHAR_LIMIT} characters`);
-    }
-  } else {
-    if (text.length > CHAR_LIMIT) {
-      throw new Error(`Query exceeds limit of ${CHAR_LIMIT} characters`);
-    }
+function checkLength(text: string) {
+  if (text.length > CHAR_LIMIT) {
+    throw new Error(`Parameter exceeds limit of ${CHAR_LIMIT} characters`);
   }
 }

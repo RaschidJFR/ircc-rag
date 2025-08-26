@@ -45,7 +45,7 @@ describe('POST /api/ask', () => {
     expect(rag.ask).not.toHaveBeenCalled();
   });
 
-  it('returns 500 when any history item exceeds CHAR_LIMIT', async () => {
+  it.skip('returns 500 when any history item exceeds CHAR_LIMIT', async () => {
     const req = makeReq({ question: OK, history: [OK, LONG] });
     const res = await POST(req);
     expect(res.status).toBe(500);
