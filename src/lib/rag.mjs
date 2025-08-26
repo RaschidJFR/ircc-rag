@@ -276,7 +276,7 @@ ${references}
   return content;
 }
 
-export async function ask(query, messageHistory = [], { maxFollowUps = 0, logger: logger = new SessionLogger() } = {}) {
+export async function ask(query, messageHistory = [], { logger: logger = new SessionLogger() } = {}) {
   try {
     _logger = logger;
     logger?.append('## Question\n\n', '>', query);
@@ -289,47 +289,21 @@ export async function ask(query, messageHistory = [], { maxFollowUps = 0, logger
       return { answer: sanitizedResponse.output, error: sanitizedResponse.error };
     }
 
-    const fullQuery = sanitizedResponse.output;
-    let keyQuestion = fullQuery;
-    logger?.appendResult(keyQuestion, '', 'Sanitized Query:');
+    query = sanitizedResponse.output;
+    logger?.appendResult(query, 'txt', 'Sanitized Query');
 
-    let pendingQuestions = await decomposeQuery(keyQuestion);
-    let finalAnswer = '';
-    let refIndex = 0;
+    const chunks = await vectorSearch(query);
+    const mdReferences = chunksToMarkdown(chunks);
+    logger?.appendResult(mdReferences, 'markdown', `## References (${chunks.length})`);
 
-    while (pendingQuestions.length > 0 && maxFollowUps-- >= 0) {
-      keyQuestion = await extractKeyQuestion(fullQuery, pendingQuestions);
+    const answer = await generateAnswer(query, mdReferences, messageHistory);
+    logger?.appendResult(answer, 'markdown', `## Answer`);
 
-      // Log key and pending questions
-      const mdQuestions = pendingQuestions.filter((q) => q !== keyQuestion).map((q) => '- [ ] ' + q);
-      mdQuestions.unshift(`- [x] ${keyQuestion}`);
-      logger?.appendResult(mdQuestions.join('\n'), 'markdown', 'Key Questions');
-
-      const retrievedChunks = await vectorSearch(fullQuery);
-      const mdReferences = chunksToMarkdown(retrievedChunks, refIndex);
-      refIndex += retrievedChunks.length;
-      logger?.appendResult(mdReferences, 'markdown', `## References (${retrievedChunks.length})`);
-
-      const answer = await generateAnswer(fullQuery, mdReferences, messageHistory);
-      logger?.appendResult(answer, 'markdown', `## Answer\n${fullQuery}`);
-      logger?.insert(logger?.content.pop(), -1); // swap the last to items in logger.content
-      finalAnswer += '\n\n' + answer;
-
-      if (maxFollowUps > 0) {
-        pendingQuestions = await evaluateFollowUp(pendingQuestions, finalAnswer);
-        if (pendingQuestions.length > 0) {
-          logger?.appendResult(pendingQuestions.map((q) => '- [ ]' + q).join('\n'), '', `# Follow-up`);
-          keyQuestion = pendingQuestions[0];
-        }
-      }
-    }
-
-    //TODO: dedup answer in case follow up is redundant
-
+    logger?.insert(logger?.content.pop(), -1); // swap the last to items in logger
     logger?.write();
-    return { answer: finalAnswer };
+    return { answer };
   } catch (e) {
-    logger?.appendResult('Error: ' + e.message, 'log');
+    logger?.appendResult(e.message, 'txt', 'Error');
     logger?.write();
     throw e;
   }
