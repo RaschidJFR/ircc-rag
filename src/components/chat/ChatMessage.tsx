@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { ChatMessage as ChatMessageType } from './chat.d';
 import Link from 'next/link';
+import { CollapsibleBlockquote } from './CollapsibleBlockquote';
 
 interface ChatMessageProps {
   message: ChatMessageType;
@@ -29,7 +30,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onLinkClick }
                 components={{
                   a: ({ href, children }) => (
                     <Link
-                      href={`/?show=${encodeURI(href)}`}
+                      href={`/?show=${encodeURIComponent(href)}`}
                       className="text-blue-600 hover:text-blue-800 underline cursor-pointer"
                       onClick={() => onLinkClick?.()}
                     >
@@ -45,6 +46,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, onLinkClick }
                   ),
                   pre: ({ children }) => (
                     <pre className="bg-gray-200 p-2 rounded text-sm overflow-x-auto">{children}</pre>
+                  ),
+                  blockquote: ({ children }) => (
+                    <CollapsibleBlockquote>{children}</CollapsibleBlockquote>
                   ),
                 }}
               >

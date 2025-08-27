@@ -2,7 +2,16 @@
 
 This work in progress of a **chatbot** is designed as an AI companion to answer immigration-related questions about [Immigration, Refugees and Citizenship Canada (IRCC)](https://ircc.canada.ca/).
 
+Live Demo 👉 [https://ircc-rag.vercel.app/](https://ircc-rag.vercel.app/)
+
 ![](./docs/demo.png)
+
+**Features:**
+
+- 𝗔𝘀𝗸 𝗻𝗮𝘁𝘂𝗿𝗮𝗹𝗹𝘆: No pre-set topics or options, just ask like you would on Reddit and get useful answers.
+- 𝗔𝗰𝗰𝘂𝗿𝗮𝗰𝘆: Looking good thanks to low model temperature, decent chunking, and *context reconstruction*.
+- 𝗙𝗮𝗰𝘁 𝗰𝗵𝗲𝗰𝗸𝗶𝗻𝗴: Every answer comes with references for verification and user trust.
+- 𝗡𝗼 𝗰𝗼𝗻𝘁𝗲𝘅𝘁 𝘀𝘄𝗶𝘁𝗰𝗵𝗶𝗻𝗴: Preview reference links with text highlights without leaving the chat.
 
 The AI chatbot uses a method called Retrieval Augmented Generation (RAG) to access official IRCC documentation online and provide accurate responses based on that information. The project is built on [Next.js](https://nextjs.org/).
 
@@ -34,6 +43,7 @@ npm start
 ```
 
 #### Complementary CLI
+
 During development, you can interact with the chat agent through the terminal by running this script (requires starting the server):
 
 ```sh
@@ -50,7 +60,8 @@ npm run cli
   - [ ] Create a cron job to update data periodically
 - [ ] Provide references
   - [x] Ensure links to all relevant sources are included in the response
-  - [ ] Support text fragments in browser
+  - [x] Support text fragments in browser
+  - [x] Quote reference text
 - [ ] UI/UX
   - [x] Build and deploy a mobile-friendly web UI
   - [ ] Explore creating a Chrome extension for better integration with IRCC
@@ -62,7 +73,7 @@ npm run cli
     - [ ] Automate tests
   - [x] Backend security
     - [x] Limit proxied routes to `canada.ca` domain only
-    - [x] Limit query length 
+    - [x] Limit query length
     - [x] Limit query rates (handled by [Vercel](https://vercel.com/docs/vercel-firewall/ddos-mitigation))
 - [ ] Accuracy
   - [ ] Try and report different models performance
