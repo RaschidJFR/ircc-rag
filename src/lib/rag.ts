@@ -54,8 +54,8 @@ export async function sanitizeQuery(query: string, messageHistory = [], model = 
   const { output, error } = await model
     .withStructuredOutput(
       z.object({
-        output: z.string().nullish().describe('The reformulated query. Empty if an error is raised'),
-        error: z.string().describe('The error, if any'),
+        output: z.string().nullable().describe('The reformulated query. Empty if an error is raised'),
+        error: z.string().optional().describe('The error, if any'),
       })
     )
     .invoke(prompt);
